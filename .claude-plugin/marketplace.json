@@ -1,0 +1,14 @@
+{
+  "name": "lacolaco-plugins",
+  "description": "Claude Code plugins by lacolaco",
+  "plugins": [
+    {
+      "name": "protect-main-branch",
+      "description": "Prevent direct edits and pushes to the main branch in Claude Code",
+      "version": "1.0.0",
+      "source": "github",
+      "repo": "lacolaco/claude-plugins",
+      "path": "protect-main-branch"
+    }
+  ]
+}
