@@ -1,0 +1,11 @@
+{
+  "name": "protect-main-branch",
+  "description": "Prevent direct edits and pushes to the main branch in Claude Code. Blocks Write, Edit, and git push operations when on the main branch.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Suguru Inatomi"
+  },
+  "repository": "https://github.com/lacolaco/claude-plugins",
+  "license": "MIT",
+  "keywords": ["git", "branch-protection", "hooks", "main-branch"]
+}
