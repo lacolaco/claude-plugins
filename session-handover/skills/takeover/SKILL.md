@@ -1,44 +1,44 @@
 ---
 name: takeover
-description: "前のセッションから引き継いでタスクを再開する。引き継ぎ文書を読み込み、構造化されたプロセスで作業を再開するためのスキル。「引き継ぎ」「テイクオーバー」「前回の続き」「再開」「task.local.mdを読んで」「続きをやって」といったキーワードや、前セッションからの作業再開を示唆する発言があれば必ず使用すること。"
+description: "Resume work from a previous session's handover document. Reads the document and follows a structured process to restart work safely. Use this skill whenever the user mentions 'takeover', 'take over', 'resume', 'continue', 'pick up where we left off', 'read task.local.md', or any phrase suggesting they want to continue work from a previous session."
 user-invocable: true
 ---
 
-前セッションの引き継ぎ文書を読み込み、作業を再開する。
+Read the handover document from the previous session and resume work.
 
-引き継ぎ文書のパスが $ARGUMENTS で指定される。指定がなければ `<workspaceRootDir>/task.local.md` を使用する。
+The document path is specified via $ARGUMENTS. If not provided, use `<workspaceRootDir>/task.local.md`.
 
-## 手順
+## Steps
 
-以下の3フェーズを順に実行する。Phase 1-2が完了するまでコードの読み書きや `git` 操作を行わない。不完全な理解のまま行動に移ると、古い仮定に基づいた作業で時間を浪費し、バグを埋め込むリスクがある。
+Execute the following 3 phases in order. Do not read or write code, or run `git` operations until Phase 1-2 are complete. Acting on an incomplete understanding risks wasting time on stale assumptions and introducing bugs.
 
-### Phase 1: 読解
+### Phase 1: Read and Understand
 
-1. 引き継ぎ文書を全文読む
-2. 各セクションを以下の観点で読む:
-   - **Goals**: タスク全体のスコープを把握する。未完了ゴールが現在も有効か、後でユーザーに確認する
-   - **Current State**: 前セッション終了時点の状態を把握する。Phase 3で実態と照合して検証する
-   - **Tasks**: Phase 2でタスクツールに外部化する対象
-   - **Facts**: 検証済みとされる事実。ただし前セッションの判断であり、**「確認済み」「確定」と書かれていても、自分で検証するまでは仮説として扱う**
-   - **Hypotheses**: 未検証の仮説。検証方法が記載されていれば、それに従って検証する
-   - **Failure Log**: 失敗したアプローチの記録。同じ失敗を繰り返さないための制約として認識する
-   - **Issues**: 未解決の課題。Phase 2でタスク化するか、ブロッカーとして扱うか判断する
-   - **Plans**: 前セッションが立てた方針。参考にするが、拘束力はない
-   - **Notes**: 補足情報として認識する
+1. Read the handover document in full
+2. Process each section with the following lens:
+   - **Goals**: Understand the overall scope. Confirm with the user later whether pending goals are still valid
+   - **Current State**: Note the state as described. Verify against reality in Phase 3
+   - **Tasks**: These will be externalized in Phase 2
+   - **Facts**: Stated as verified, but these are the previous session's judgments. **Treat everything as a hypothesis until you verify it yourself, even if marked as "confirmed" or "verified"**
+   - **Hypotheses**: Unverified assumptions. Follow the stated verification methods if provided
+   - **Failure Log**: Record of failed approaches. Treat these as constraints to avoid repeating the same mistakes
+   - **Issues**: Unresolved concerns. Decide in Phase 2 whether to convert them to tasks or treat as blockers
+   - **Plans**: The previous session's intended strategy. Use as reference, but it is not binding
+   - **Notes**: Acknowledge as supplementary context
 
-### Phase 2: タスク外部化
+### Phase 2: Externalize Tasks
 
-3. Tasks・Issues・未完了のGoalsから、未解決の全タスクを TaskCreate で作成する
-4. タスク間の依存関係を TaskUpdate で設定する
+3. Create all outstanding tasks from the Tasks, Issues, and pending Goals sections using TaskCreate
+4. Set dependencies between tasks using TaskUpdate
 
-コンテキストウィンドウが進むにつれ、初期に読んだ引き継ぎ文書の詳細は圧縮・消失する。タスクツールに外部化しておけば、作業全体の見通しを維持できる。
+As the context window progresses, details from the handover document read early on will be compressed or lost. Externalizing to task tools preserves visibility over the full scope of work.
 
-タスクツールが利用できない場合は、タスクリストを会話内にチェックリストとして出力する。
+If task tools are unavailable, output the task list as a checklist in the conversation.
 
-### Phase 3: 検証と実行
+### Phase 3: Verify and Execute
 
-5. タスクリストに従い、作業を進める
-6. 各タスクに着手する前に、そのタスクの前提となる事実を検証する。引き継ぎ文書の記述を鵜呑みにせず、コード・ログ・テスト結果で裏取りする
-7. 引き継ぎ文書の内容と現実にギャップがあれば、引き継ぎ文書を修正する
+5. Work through the task list
+6. Before starting each task, verify the facts it depends on. Do not take the handover document's claims at face value — cross-check against code, logs, and test results
+7. If the handover document and reality diverge, update the handover document
 
-不明点があればユーザーに質問する。推測で補完しない。
+Ask the user if anything is unclear. Do not fill gaps with guesses.

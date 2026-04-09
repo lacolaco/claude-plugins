@@ -1,43 +1,43 @@
 ---
 name: handover
-description: "Claude Codeセッション終了時に構造化された引き継ぎ文書を作成・更新する。セッション間のタスク継続性を確保するためのスキル。「引き継ぎ」「ハンドオーバー」「セッション終了」「作業を終える」「次のセッションに引き継ぐ」「今日はここまで」といったキーワードや、セッション終了を示唆する発言があれば必ず使用すること。"
+description: "Create or update a structured handover document at the end of a Claude Code session to ensure task continuity across sessions. Use this skill whenever the user mentions 'handover', 'hand over', 'wrap up', 'end session', 'done for today', 'pass it on', 'save progress', or any phrase suggesting they want to end the current session and preserve context for the next one."
 user-invocable: true
 ---
 
-後任のClaudeセッションに向けて、作業の引き継ぎ文書を作成・更新する。
+Create or update a handover document for the next Claude session.
 
-引き継ぎ文書のパスが $ARGUMENTS で指定される。指定がなければ `<workspaceRootDir>/task.local.md` を使用する。
+The document path is specified via $ARGUMENTS. If not provided, use `<workspaceRootDir>/task.local.md`.
 
-## 手順
+## Steps
 
-### Phase 1: 情報収集
+### Phase 1: Gather Information
 
-文書を書く前に、現在の状況を正確に把握する。以下を確認すること。
+Before writing, build an accurate picture of the current state:
 
-1. 既存の引き継ぎ文書があれば読み、現状とのギャップを把握する
-2. `git status` と `git log` で作業の実態を確認する
-3. TaskList で未完了タスクを確認する（タスクツールが利用できない場合はスキップ）
-4. セッション中に試みて失敗したアプローチを振り返る
+1. If an existing handover document exists, read it and identify gaps with the current state
+2. Run `git status` and `git log` to confirm the actual state of work
+3. Check TaskList for outstanding tasks (skip if task tools are unavailable)
+4. Recall approaches attempted and failed during this session
 
-### Phase 2: 文書の作成・更新
+### Phase 2: Write the Document
 
-収集した情報を元に、テンプレートに従って引き継ぎ文書を作成する。既存文書がある場合も、最新の状態を正確に反映するために**テンプレートに沿って全体を書き直す**。前の文書を参照しつつ、現在のセッションで得た情報で更新する。
+Based on gathered information, write the handover document following the template below. Even if an existing document exists, **rewrite it entirely from the template** to ensure accuracy. Use the previous document as a reference, but reflect the current session's state.
 
-**仮説と事実は厳密に区別する。** 「おそらくこうだろう」と判断したことを事実として書くと、後任は検証なしにその前提で進めてしまう。仮説には蓋然性を、事実には根拠を明記する。
+**Strictly distinguish hypotheses from facts.** If something was judged as "probably X" during this session, do not write it as a fact. The next session will act on it without verification. State the confidence level for hypotheses and cite evidence for facts.
 
-不明点があればユーザーに質問する。推測で補完しない。
+Ask the user if anything is unclear. Do not fill gaps with guesses.
 
-### Phase 3: 自己検証
+### Phase 3: Self-Review
 
-文書を書き終えたら、以下の観点で検証する。
+After writing, verify the document:
 
-- 後任がこの文書だけを読んで作業を再開できるか？
-- 事実と仮説が混同されていないか？
-- ネクストアクションは具体的か？（「調査する」ではなく「〇〇ファイルの△△関数の挙動を確認する」レベル）
+- Can the next session resume work from this document alone?
+- Are facts and hypotheses clearly separated?
+- Are next actions specific? ("Investigate the behavior of function X in file Y" rather than just "investigate")
 
-## テンプレート
+## Template
 
-以下のMarkdownテンプレートに従う。各セクションのコメントはガイドラインであり、出力には含めない。
+Follow this Markdown template. The comments in each section are guidelines — do not include them in the output.
 
 ```markdown
 # Handover Document
@@ -45,31 +45,31 @@ user-invocable: true
 Written at: YYYY-MM-DD
 
 ## Goals
-<!-- タスク全体のゴールをチェックリストで記載する。完了済み・未完了を明示する -->
+<!-- List overall task goals as a checklist. Mark completed and pending items -->
 - [x] Completed goal
 - [ ] Pending goal
 
 ## Current State
-<!-- 現在の作業状態を簡潔に記述する。何が動いていて何が動いていないか -->
+<!-- Briefly describe the current state of work. What's working and what isn't -->
 
 ## Tasks
-<!-- 未完了の具体的タスクを優先度順に記載する。依存関係があれば明記する -->
+<!-- List outstanding tasks in priority order. Note dependencies if any -->
 
 ## Facts
-<!-- 検証済みの事実。根拠（コード箇所、ログ、ドキュメントURL等）を併記する -->
+<!-- Verified facts. Cite evidence (code locations, logs, documentation URLs, etc.) -->
 
 ## Hypotheses
-<!-- 未検証の仮説。蓋然性（高/中/低）と検証方法を併記する -->
+<!-- Unverified hypotheses. State confidence level (high/medium/low) and how to verify -->
 
 ## Failure Log
-<!-- 試みて失敗したアプローチ。何を試し、なぜ失敗したかを記録する。後任が同じ轍を踏まないために重要 -->
+<!-- Approaches that were tried and failed. Record what was tried and why it failed. Critical for preventing the next session from repeating the same mistakes -->
 
 ## Issues
-<!-- 未解決の課題や懸念事項 -->
+<!-- Unresolved concerns or blockers -->
 
 ## Plans
-<!-- 今後の方針・戦略 -->
+<!-- Strategy and direction going forward -->
 
 ## Notes
-<!-- その他、後任に伝えるべき補足情報 -->
+<!-- Any other information the next session should know -->
 ```
