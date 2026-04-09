@@ -10,6 +10,12 @@
       "description": "Prevent direct edits and pushes to the main branch in Claude Code",
       "version": "1.0.0",
       "source": "./protect-main-branch"
+    },
+    {
+      "name": "session-handover",
+      "description": "Session handover and takeover skills for managing task continuity between Claude Code sessions",
+      "version": "1.0.0",
+      "source": "./session-handover"
     }
   ]
 }

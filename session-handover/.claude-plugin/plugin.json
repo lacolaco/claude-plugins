@@ -1,0 +1,11 @@
+{
+  "name": "session-handover",
+  "description": "Session handover and takeover skills for Claude Code. Manages task continuity between sessions.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Suguru Inatomi"
+  },
+  "repository": "https://github.com/lacolaco/claude-plugins",
+  "license": "MIT",
+  "keywords": ["session", "handover", "takeover", "task-management", "continuity"]
+}
