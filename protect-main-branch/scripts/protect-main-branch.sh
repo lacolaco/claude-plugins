@@ -20,4 +20,4 @@ if [ -n "$file_path" ]; then
   fi
 fi
 
-echo '{"decision":"block","reason":"Cannot edit/push on main branch. Create a feature branch first."}'
+echo '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Cannot edit/push on main branch. Create a feature branch first."}}'
