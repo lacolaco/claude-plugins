@@ -25,8 +25,22 @@ Blocks Write, Edit, and `git push` operations when on the main branch in Claude 
 When blocked, the hook returns:
 
 ```
-Cannot edit/push on main branch. Create a feature branch first.
+Cannot edit/push on <branch> branch. Create a feature branch first.
 ```
+
+### Configuration
+
+The protected branch name defaults to `main`. To protect a different branch (e.g., `master`, `trunk`), set the `PROTECT_MAIN_BRANCH_NAME` environment variable in your Claude Code `settings.json`:
+
+```json
+{
+  "env": {
+    "PROTECT_MAIN_BRANCH_NAME": "master"
+  }
+}
+```
+
+This can be set at user scope (`~/.claude/settings.json`), project scope (`.claude/settings.json`), or local (`.claude/settings.local.json`).
 
 ### Installation
 

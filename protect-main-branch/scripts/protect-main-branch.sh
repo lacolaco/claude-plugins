@@ -1,8 +1,11 @@
 #!/bin/bash
-# Guard: block Write/Edit/push on main branch
+# Guard: block Write/Edit/push on the protected branch
+# The protected branch name can be configured via the PROTECT_MAIN_BRANCH_NAME
+# environment variable (defaults to "main").
 
+protected_branch="${PROTECT_MAIN_BRANCH_NAME:-main}"
 branch=$(git branch --show-current 2>/dev/null)
-if [ "$branch" != "main" ]; then
+if [ "$branch" != "$protected_branch" ]; then
   exit 0
 fi
 
@@ -20,4 +23,4 @@ if [ -n "$file_path" ]; then
   fi
 fi
 
-echo '{"decision":"block","reason":"Cannot edit/push on main branch. Create a feature branch first."}'
+jq -n --arg branch "$protected_branch" '{"decision":"block","reason":("Cannot edit/push on " + $branch + " branch. Create a feature branch first.")}'
