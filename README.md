@@ -30,12 +30,12 @@ Cannot edit/push on <branch> branch. Create a feature branch first.
 
 ### Configuration
 
-The protected branch name defaults to `main`. To protect a different branch (e.g., `master`, `trunk`), set the `PROTECT_MAIN_BRANCH_NAME` environment variable in your Claude Code `settings.json`:
+The protected branch name defaults to `main`. To protect a different branch or multiple branches, set the `PROTECT_MAIN_BRANCH_NAME` environment variable (space-separated list) in your Claude Code `settings.json`:
 
 ```json
 {
   "env": {
-    "PROTECT_MAIN_BRANCH_NAME": "master"
+    "PROTECT_MAIN_BRANCH_NAME": "main master develop"
   }
 }
 ```
