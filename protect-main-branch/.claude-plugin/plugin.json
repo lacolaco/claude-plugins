@@ -1,7 +1,7 @@
 {
   "name": "protect-main-branch",
-  "description": "Prevent direct edits and pushes to the main branch (or a configured branch) in Claude Code. Blocks Write, Edit, and git push operations on the protected branch.",
-  "version": "1.1.0",
+  "description": "Prevent direct edits and pushes to the main branch (or configured branches) in Claude Code. Blocks Write, Edit, and git push operations on the protected branch(es).",
+  "version": "1.2.0",
   "author": {
     "name": "Suguru Inatomi"
   },
