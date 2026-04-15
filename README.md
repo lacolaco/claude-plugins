@@ -6,17 +6,17 @@ Claude Code plugins by lacolaco.
 
 | Plugin | Description |
 |--------|-------------|
-| [protect-main-branch](./protect-main-branch) | Prevent direct edits and pushes to the main branch |
+| [protect-main-branch](./protect-main-branch) | Prevent direct edits and pushes to the main branch (configurable) |
 | [session-handover](./session-handover) | Session handover/takeover for task continuity between sessions |
 
 ## protect-main-branch
 
-Blocks Write, Edit, and `git push` operations when on the main branch in Claude Code.
+Blocks Write, Edit, and `git push` operations when on the protected branch (defaults to `main`) in Claude Code.
 
 ### How it works
 
-- On any branch other than `main`: no-op (all operations allowed)
-- On `main` branch:
+- On any branch other than the protected branch: no-op (all operations allowed)
+- On the protected branch:
   - **Write/Edit**: Blocks editing tracked (non-gitignored) files within the repository
   - **Bash**: Blocks `git push` commands
   - Editing gitignored files is always allowed
@@ -25,8 +25,22 @@ Blocks Write, Edit, and `git push` operations when on the main branch in Claude 
 When blocked, the hook returns:
 
 ```
-Cannot edit/push on main branch. Create a feature branch first.
+Cannot edit/push on <branch> branch. Create a feature branch first.
 ```
+
+### Configuration
+
+The protected branch name defaults to `main`. To protect a different branch (e.g., `master`, `trunk`), set the `PROTECT_MAIN_BRANCH_NAME` environment variable in your Claude Code `settings.json`:
+
+```json
+{
+  "env": {
+    "PROTECT_MAIN_BRANCH_NAME": "master"
+  }
+}
+```
+
+This can be set at user scope (`~/.claude/settings.json`), project scope (`.claude/settings.json`), or local (`.claude/settings.local.json`).
 
 ### Installation
 
