@@ -6,17 +6,17 @@ Claude Code plugins by lacolaco.
 
 | Plugin | Description |
 |--------|-------------|
-| [protect-main-branch](./protect-main-branch) | Prevent direct edits and pushes to the main branch |
+| [protect-main-branch](./protect-main-branch) | Prevent direct edits and pushes to the main branch (configurable) |
 | [session-handover](./session-handover) | Session handover/takeover for task continuity between sessions |
 
 ## protect-main-branch
 
-Blocks Write, Edit, and `git push` operations when on the main branch in Claude Code.
+Blocks Write, Edit, and `git push` operations when on the protected branch (defaults to `main`) in Claude Code.
 
 ### How it works
 
-- On any branch other than `main`: no-op (all operations allowed)
-- On `main` branch:
+- On any branch other than the protected branch: no-op (all operations allowed)
+- On the protected branch:
   - **Write/Edit**: Blocks editing tracked (non-gitignored) files within the repository
   - **Bash**: Blocks `git push` commands
   - Editing gitignored files is always allowed
