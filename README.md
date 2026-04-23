@@ -8,6 +8,7 @@ Claude Code plugins by lacolaco.
 |--------|-------------|
 | [protect-main-branch](./protect-main-branch) | Prevent direct edits and pushes to the main branch (configurable) |
 | [session-handover](./session-handover) | Session handover/takeover for task continuity between sessions |
+| [retrospective](./retrospective) | Structured 6-stage retrospective for tasks, PRs, and incidents |
 
 ## protect-main-branch
 
@@ -71,6 +72,29 @@ The takeover skill enforces a disciplined approach: it reads the handover docume
 ```
 /plugin marketplace add lacolaco/claude-plugins
 /plugin install session-handover@lacolaco-plugins
+```
+
+## retrospective
+
+Provides the `/retrospective` skill: a structured 6-stage framework (input → interpretation → planning → action → inspection → output) for reviewing a completed task, PR, or incident.
+
+### How it works
+
+The skill walks through five phases:
+
+1. **Fact recording** — log what happened at each of the 6 stages, without mixing in interpretation
+2. **Bottom-up Problem surfacing** — trace Problems from downstream stages (Output, Inspection) up to upstream (Interpretation, Input) to find the true cause
+3. **Keep extraction** — capture reusable success patterns
+4. **Top-down Try rollout** — apply fixes from upstream down; do not plug the same hole twice
+5. **Improvement implementation flow** — for each Try, judge in order: (1) eliminate, (2) deterministic guardrail, (3) skill, (4) agent prompt, (5) workspace `CLAUDE.md` as the last resort
+
+All retrospective outcomes are written to workspace-local locations only — the skill does not modify the global `~/.claude/` layer.
+
+### Installation
+
+```
+/plugin marketplace add lacolaco/claude-plugins
+/plugin install retrospective@lacolaco-plugins
 ```
 
 ## License

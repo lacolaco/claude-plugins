@@ -16,6 +16,12 @@
       "description": "Session handover and takeover skills for managing task continuity between Claude Code sessions",
       "version": "1.0.0",
       "source": "./session-handover"
+    },
+    {
+      "name": "retrospective",
+      "description": "Retrospective skill based on a 6-stage process (input → interpretation → planning → action → inspection → output) to surface problems and apply improvements",
+      "version": "1.0.0",
+      "source": "./retrospective"
     }
   ]
 }

@@ -1,0 +1,11 @@
+{
+  "name": "retrospective",
+  "description": "Retrospective skill based on a 6-stage process (input → interpretation → planning → action → inspection → output). Surfaces problems bottom-up from outputs and applies fixes top-down from upstream.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Suguru Inatomi"
+  },
+  "repository": "https://github.com/lacolaco/claude-plugins",
+  "license": "MIT",
+  "keywords": ["retrospective", "review", "postmortem", "improvement", "workflow"]
+}
