@@ -205,6 +205,9 @@ def split_into_chunks(text: str, max_chars: int) -> list[str]:
 
 FIXED_MESSAGES = {
     "PermissionRequest": "承認待ちです。",
+    # Only the `idle_prompt` Notification subtype is wired up in hooks.json,
+    # so this fixed phrase is appropriate for every Notification we see.
+    "Notification": "お待ちしています。",
 }
 
 
