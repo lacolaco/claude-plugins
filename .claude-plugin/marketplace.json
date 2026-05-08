@@ -8,7 +8,7 @@
     {
       "name": "protect-main-branch",
       "description": "Prevent direct edits and pushes to the main branch (or configured branches) in Claude Code",
-      "version": "1.2.0",
+      "version": "1.2.1",
       "source": "./protect-main-branch"
     },
     {
