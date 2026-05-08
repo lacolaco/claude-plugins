@@ -52,6 +52,8 @@ CUSTOM = {
     "Anthropic": "アンソロピック",
     "Claude": "クロード",
     "lacolaco": "ラコラコ",
+    "plugin": "プラグイン",
+    "Plugin": "プラグイン",
 }
 _CUSTOM_SORTED = sorted(CUSTOM.items(), key=lambda x: -len(x[0]))
 
