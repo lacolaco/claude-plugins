@@ -104,18 +104,24 @@ Reads Claude Code's responses aloud on your machine using [Kokoro TTS](https://h
 
 ### How it works
 
-The plugin registers three hook events:
+The plugin subscribes to three hook events:
 
-- **`Stop`** — fires when Claude finishes a normal response
-- **`StopFailure`** — fires when the turn ends due to an API error
-- **`PermissionRequest`** — fires when a tool needs approval; speaks the fixed Japanese phrase 「承認待ちです。」
-- **`Notification`** with `matcher: "idle_prompt"` — fires when Claude Code is idle waiting for input; speaks 「お待ちしています。」 (other Notification subtypes such as `auth_success` and `elicitation_*` are intentionally not subscribed)
+- **`Stop`** — fires when Claude finishes a normal response; reads `last_assistant_message`
+- **`StopFailure`** — fires when the turn ends due to an API error; reads `last_assistant_message`
+- **`Notification`** with two matchers:
+  - `idle_prompt` — Claude Code is idle waiting for input → speaks 「お待ちしています。」
+  - `permission_prompt` — a tool needs approval → speaks 「承認待ちです。」
 
-Each hook calls `scripts/dispatch.sh`, which:
+  (Other Notification subtypes such as `auth_success` and `elicitation_*` are intentionally not subscribed.)
+
+Each hook calls `scripts/dispatch.sh`. For Notification matchers a fixed Japanese phrase is passed as the first argument; the dispatcher then injects it into `last_assistant_message` before forwarding (the system payload would otherwise be unintelligible English/freeform).
+
+The dispatcher:
 
 1. Reads the hook input JSON from stdin and extracts `session_id`
 2. Skips silently unless `~/.claude/kokoro-tts/sessions/<session_id>` exists (per-session flag)
-3. Forwards the JSON to `scripts/say-response.py`, which:
+3. Optionally overrides `last_assistant_message` with the fixed phrase argument
+4. Forwards the JSON to `scripts/say-response.py`, which:
    - Terminates any in-progress playback from a previous hook so a fresh response replaces (not overlaps with) the older one (single-flight via process-group `killpg`)
    - Strips Markdown (code blocks, tables, URLs, parentheses, etc.)
    - Replaces common technical terms with katakana via a built-in dictionary; falls back to `alkana` for the rest
