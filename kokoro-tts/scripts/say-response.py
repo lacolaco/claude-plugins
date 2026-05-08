@@ -45,6 +45,7 @@ CUSTOM = {
     "JavaScript": "ジャバスクリプト",
     "Anthropic": "アンソロピック",
     "Claude": "クロード",
+    "lacolaco": "ラコラコ",
 }
 _CUSTOM_SORTED = sorted(CUSTOM.items(), key=lambda x: -len(x[0]))
 
