@@ -39,6 +39,14 @@ LATER_CHUNK_MAX = 250
 FAST_SPEED_CHUNK_THRESHOLD = 4
 FAST_SPEED_SCALE = 1.2
 
+# Hard cap on how many chunks a single response can produce. Past this, the
+# rest of the text is dropped and a truncation notice is appended so the user
+# hears the cut instead of an abrupt mid-sentence stop. Without this cap, a
+# very long response can play for over a minute and there is no easy way to
+# interrupt it once it has started.
+MAX_CHUNKS = 8
+TRUNCATION_NOTICE = "以下、省略します。"
+
 PIDFILE = os.path.expanduser("~/.claude/session-tts/playback.pid")
 
 
@@ -277,6 +285,8 @@ def main() -> None:
     chunks = split_into_chunks(text)
     if not chunks:
         return
+    if len(chunks) > MAX_CHUNKS:
+        chunks = chunks[:MAX_CHUNKS] + [TRUNCATION_NOTICE]
 
     kill_previous_playback()
     register_self()
