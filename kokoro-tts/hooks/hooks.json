@@ -24,8 +24,20 @@
         ]
       }
     ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/dispatch.sh\"",
+            "async": true
+          }
+        ]
+      }
+    ],
     "Notification": [
       {
+        "matcher": "idle_prompt",
         "hooks": [
           {
             "type": "command",

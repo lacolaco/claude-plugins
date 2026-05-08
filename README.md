@@ -108,7 +108,8 @@ The plugin registers three hook events:
 
 - **`Stop`** — fires when Claude finishes a normal response
 - **`StopFailure`** — fires when the turn ends due to an API error
-- **`Notification`** — fires for notifications such as approval prompts (reads the `message` field)
+- **`PermissionRequest`** — fires when a tool needs approval; speaks the fixed Japanese phrase 「承認待ちです。」
+- **`Notification`** with `matcher: "idle_prompt"` — fires when Claude Code is idle waiting for input; speaks 「お待ちしています。」 (other Notification subtypes such as `auth_success` and `elicitation_*` are intentionally not subscribed)
 
 Each hook calls `scripts/dispatch.sh`, which:
 
