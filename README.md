@@ -9,6 +9,7 @@ Claude Code plugins by lacolaco.
 | [protect-main-branch](./protect-main-branch) | Prevent direct edits and pushes to the main branch (configurable) |
 | [session-handover](./session-handover) | Session handover/takeover for task continuity between sessions |
 | [retrospective](./retrospective) | Structured 6-stage retrospective for tasks, PRs, and incidents |
+| [kokoro-tts](./kokoro-tts) | Read Claude Code responses aloud locally using Kokoro TTS via mlx-audio (Apple Silicon, Japanese voice) |
 
 ## protect-main-branch
 
@@ -96,6 +97,67 @@ All retrospective outcomes are written to workspace-local locations only — the
 /plugin marketplace add lacolaco/claude-plugins
 /plugin install retrospective@lacolaco-plugins
 ```
+
+## kokoro-tts
+
+Reads Claude Code's responses aloud on your machine using [Kokoro TTS](https://huggingface.co/hexgrad/Kokoro-82M) via [mlx-audio](https://github.com/ml-explore/mlx-audio). Inference runs locally; no external API calls during playback.
+
+### How it works
+
+The plugin registers three hook events:
+
+- **`Stop`** — fires when Claude finishes a normal response
+- **`StopFailure`** — fires when the turn ends due to an API error
+- **`Notification`** — fires for notifications such as approval prompts (reads the `message` field)
+
+Each hook is gated by the presence of the file `~/.claude/voice-enabled`. When that file exists, the script:
+
+1. Reads the hook input JSON from stdin (`last_assistant_message` for `Stop`/`StopFailure`, `message` for `Notification`)
+2. Strips Markdown (code blocks, tables, URLs, parentheses, etc.)
+3. Replaces common technical terms with katakana via a built-in dictionary; falls back to `alkana` for the rest
+4. Synthesizes audio with Kokoro (`jf_alpha`, the highest-rated Japanese voice)
+5. Plays the WAV with macOS `afplay` and deletes the temp file
+
+The hook command runs through `uv run --directory ${CLAUDE_PLUGIN_ROOT}/python`, so the Python environment is isolated to the plugin.
+
+### Toggle voice playback
+
+Use the bundled `claude-voice` command (available on the Bash tool's PATH while the plugin is enabled):
+
+```
+claude-voice on       # create ~/.claude/voice-enabled
+claude-voice off      # remove the flag
+claude-voice toggle   # flip
+claude-voice status   # show current state (default)
+```
+
+### Customize the voice
+
+Edit constants at the top of `kokoro-tts/scripts/say-response.py`:
+
+| Constant | Default | Notes |
+|---|---|---|
+| `MODEL_ID` | `mlx-community/Kokoro-82M-bf16` | HuggingFace model id |
+| `VOICE` | `jf_alpha` | Japanese voice (also available: `jf_gongitsune`, `jf_tebukuro`, `jf_nezumi`, `jm_kumo`) |
+| `SPEED` | `1.2` | Playback speed |
+| `MAX_TEXT_LENGTH` | `600` | Truncate long responses |
+
+Add domain terms to the `CUSTOM` dictionary for better katakana pronunciation.
+
+### Installation
+
+```
+/plugin marketplace add lacolaco/claude-plugins
+/plugin install kokoro-tts@lacolaco-plugins
+```
+
+After installing, run `claude-voice on` to enable playback. Toggle off any time with `claude-voice off`.
+
+### Prerequisites
+
+- macOS on Apple Silicon (M1+)
+- [`uv`](https://docs.astral.sh/uv/) on `PATH` (the plugin uses `uv run --directory`)
+- First run downloads the Kokoro model (~355 MB) from HuggingFace
 
 ## License
 

@@ -1,0 +1,39 @@
+#!/bin/bash
+# Toggle TTS playback for the kokoro-tts plugin.
+# Presence of $HOME/.claude/voice-enabled enables hook playback.
+
+set -e
+
+flag="$HOME/.claude/voice-enabled"
+mkdir -p "$(dirname "$flag")"
+
+case "${1:-status}" in
+  on)
+    touch "$flag"
+    echo "Claude voice: ON"
+    ;;
+  off)
+    rm -f "$flag"
+    echo "Claude voice: OFF"
+    ;;
+  toggle)
+    if [ -e "$flag" ]; then
+      rm -f "$flag"
+      echo "Claude voice: OFF"
+    else
+      touch "$flag"
+      echo "Claude voice: ON"
+    fi
+    ;;
+  status)
+    if [ -e "$flag" ]; then
+      echo "Claude voice: ON"
+    else
+      echo "Claude voice: OFF"
+    fi
+    ;;
+  *)
+    echo "Usage: claude-voice [on|off|toggle|status]" >&2
+    exit 1
+    ;;
+esac

@@ -22,6 +22,12 @@
       "description": "Retrospective skill based on a 6-stage process (input → interpretation → planning → action → inspection → output) to surface problems and apply improvements",
       "version": "1.0.0",
       "source": "./retrospective"
+    },
+    {
+      "name": "kokoro-tts",
+      "description": "Read Claude Code responses aloud locally using Kokoro TTS via mlx-audio. Apple Silicon only, Japanese voice.",
+      "version": "1.0.0",
+      "source": "./kokoro-tts"
     }
   ]
 }
