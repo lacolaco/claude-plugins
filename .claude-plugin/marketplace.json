@@ -25,8 +25,8 @@
     },
     {
       "name": "kokoro-tts",
-      "description": "Read Claude Code responses aloud locally using Kokoro TTS via mlx-audio. Apple Silicon only, Japanese voice.",
-      "version": "1.1.1",
+      "description": "Read Claude Code responses aloud locally using Kokoro TTS via mlx-audio. ON by default per session. Apple Silicon only, Japanese voice.",
+      "version": "1.2.0",
       "source": "./kokoro-tts"
     }
   ]

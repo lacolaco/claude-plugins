@@ -9,7 +9,7 @@ Claude Code plugins by lacolaco.
 | [protect-main-branch](./protect-main-branch) | Prevent direct edits and pushes to the main branch (configurable) |
 | [session-handover](./session-handover) | Session handover/takeover for task continuity between sessions |
 | [retrospective](./retrospective) | Structured 6-stage retrospective for tasks, PRs, and incidents |
-| [kokoro-tts](./kokoro-tts) | Read Claude Code responses aloud locally using Kokoro TTS via mlx-audio (Apple Silicon, Japanese voice) |
+| [kokoro-tts](./kokoro-tts) | Read Claude Code responses aloud locally using Kokoro TTS via mlx-audio. ON by default per session (Apple Silicon, Japanese voice) |
 
 ## protect-main-branch
 
@@ -100,12 +100,13 @@ All retrospective outcomes are written to workspace-local locations only — the
 
 ## kokoro-tts
 
-Reads Claude Code's responses aloud on your machine using [Kokoro TTS](https://huggingface.co/hexgrad/Kokoro-82M) via [mlx-audio](https://github.com/ml-explore/mlx-audio). Inference runs locally; no external API calls during playback. Playback is scoped to the session that opted in, so concurrent Claude Code sessions do not speak over each other.
+Reads Claude Code's responses aloud on your machine using [Kokoro TTS](https://huggingface.co/hexgrad/Kokoro-82M) via [mlx-audio](https://github.com/ml-explore/mlx-audio). Inference runs locally; no external API calls during playback. Playback is on by default for every new session, scoped to that session, so concurrent Claude Code sessions do not speak over each other and any session can be silenced individually.
 
 ### How it works
 
-The plugin subscribes to three hook events:
+The plugin subscribes to four hook events:
 
+- **`SessionStart`** — fires at session start (`startup`, `resume`, `clear`, `compact`); creates the per-session flag at `~/.claude/kokoro-tts/sessions/$session_id` so the session speaks by default. `touch` is idempotent, so re-firing on `clear`/`compact` is safe; if you had silenced a session with `/kokoro-tts:voice off` and then run `/clear`, the flag is recreated and the session goes back to ON.
 - **`Stop`** — fires when Claude finishes a normal response; reads `last_assistant_message`
 - **`StopFailure`** — fires when the turn ends due to an API error; reads `last_assistant_message`
 - **`Notification`** with two matchers:
@@ -114,7 +115,7 @@ The plugin subscribes to three hook events:
 
   (Other Notification subtypes such as `auth_success` and `elicitation_*` are intentionally not subscribed.)
 
-Each hook calls `scripts/dispatch.sh`. For Notification matchers a fixed Japanese phrase is passed as the first argument; the dispatcher then injects it into `last_assistant_message` before forwarding (the system payload would otherwise be unintelligible English/freeform).
+`SessionStart` calls `scripts/session-on.sh`, which just creates the per-session flag file. The other hooks call `scripts/dispatch.sh`. For Notification matchers a fixed Japanese phrase is passed as the first argument; the dispatcher then injects it into `last_assistant_message` before forwarding (the system payload would otherwise be unintelligible English/freeform).
 
 The dispatcher:
 
@@ -134,16 +135,18 @@ The Python runtime is isolated under `python/` and managed by `uv`; the hook cal
 
 ### Toggle voice playback
 
-Use the `/kokoro-tts:voice` skill from any Claude Code session:
+Voice is ON by default in every new session (created by the `SessionStart` hook). Use the `/kokoro-tts:voice` skill to override that for the current session:
 
 ```
-/kokoro-tts:voice on      # enable for THIS session
-/kokoro-tts:voice off     # disable for THIS session
+/kokoro-tts:voice off     # silence THIS session
+/kokoro-tts:voice on      # re-enable after off (also works the first time if SessionStart didn't fire)
 /kokoro-tts:voice toggle  # flip
 /kokoro-tts:voice status  # show current state (default)
 ```
 
 The skill writes to `~/.claude/kokoro-tts/sessions/$CLAUDE_CODE_SESSION_ID`, so each session is independent. Other concurrent sessions are unaffected.
+
+> Note: running `/clear` or `/compact` re-fires `SessionStart` and recreates the flag, so a session previously silenced with `voice off` will go back to ON. Run `voice off` again after the clear/compact if you want it to stay silent.
 
 ### Customize the voice
 
@@ -167,7 +170,7 @@ Add domain terms to the `CUSTOM` dictionary for better katakana pronunciation.
 /plugin install kokoro-tts@lacolaco-plugins
 ```
 
-After installing, run `/kokoro-tts:voice on` in any session you want to hear aloud.
+After installing, every new session speaks by default. Use `/kokoro-tts:voice off` to silence a particular session.
 
 ### Prerequisites
 
