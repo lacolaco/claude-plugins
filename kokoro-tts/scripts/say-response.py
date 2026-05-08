@@ -203,10 +203,22 @@ def split_into_chunks(text: str, max_chars: int) -> list[str]:
     return chunks
 
 
+FIXED_MESSAGES = {
+    "PermissionRequest": "承認待ちです。",
+}
+
+
 def main() -> None:
     data = json.load(sys.stdin)
-    # Stop / StopFailure carry `last_assistant_message`; Notification carries `message`.
-    text = data.get("last_assistant_message") or data.get("message") or ""
+    hook_event = data.get("hook_event_name", "")
+    fixed = FIXED_MESSAGES.get(hook_event)
+    if fixed is not None:
+        # System events carry English `message` payloads. Speak a fixed
+        # Japanese phrase instead so it is intelligible.
+        text = fixed
+    else:
+        # Stop / StopFailure carry `last_assistant_message`.
+        text = data.get("last_assistant_message") or ""
     if not text:
         return
 
