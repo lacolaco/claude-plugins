@@ -115,9 +115,11 @@ Each hook calls `scripts/dispatch.sh`, which:
 1. Reads the hook input JSON from stdin and extracts `session_id`
 2. Skips silently unless `~/.claude/kokoro-tts/sessions/<session_id>` exists (per-session flag)
 3. Forwards the JSON to `scripts/say-response.py`, which:
+   - Terminates any in-progress playback from a previous hook so a fresh response replaces (not overlaps with) the older one (single-flight via process-group `killpg`)
    - Strips Markdown (code blocks, tables, URLs, parentheses, etc.)
    - Replaces common technical terms with katakana via a built-in dictionary; falls back to `alkana` for the rest
    - Splits the text on sentence/clause boundaries because Kokoro truncates input at 510 phonemes per inference
+   - Picks a playback speed by interpolating between `SPEED_MIN` and `SPEED_MAX` based on the chunk count — short replies stay natural, long multi-chunk responses get a moderate speed-up
    - Synthesizes each chunk with Kokoro (`jf_alpha`, the highest-rated Japanese voice) and pushes the WAV path onto a playback queue so audio starts as soon as the first chunk is ready (synthesis and playback run in parallel)
    - A player thread drains the queue, plays each WAV with macOS `afplay` in order, and deletes the temp files
 
@@ -144,7 +146,8 @@ Edit constants at the top of `kokoro-tts/scripts/say-response.py`:
 |---|---|---|
 | `MODEL_ID` | `mlx-community/Kokoro-82M-bf16` | HuggingFace model id |
 | `VOICE` | `jf_alpha` | Japanese voice (also available: `jf_gongitsune`, `jf_tebukuro`, `jf_nezumi`, `jm_kumo`) |
-| `SPEED` | `1.2` | Playback speed |
+| `SPEED_MIN` / `SPEED_MAX` | `1.2` / `1.5` | Playback speed range; the actual speed is interpolated by chunk count |
+| `SPEED_CHUNKS_FLOOR` / `SPEED_CHUNKS_CEILING` | `1` / `8` | Chunk-count thresholds for the speed interpolation |
 | `MAX_TEXT_LENGTH` | `2000` | Truncate very long responses (after Markdown stripping) |
 | `MAX_CHARS_PER_CHUNK` | `180` | Per-inference chunk size (must keep phoneme count under Kokoro's 510 ceiling) |
 
