@@ -2,6 +2,7 @@
 
 import json
 import os
+import queue
 import re
 import subprocess
 import sys
@@ -10,7 +11,6 @@ import threading
 import warnings
 
 import alkana
-import numpy as np
 import soundfile as sf
 from mlx_audio.tts.utils import load_model
 
@@ -99,12 +99,17 @@ def en_to_kana(text: str) -> str:
     return re.sub(r"[A-Za-z]{2,}", replace_word, text)
 
 
-def play_and_cleanup(path: str) -> None:
-    subprocess.run(["afplay", path], check=False)
-    try:
-        os.unlink(path)
-    except FileNotFoundError:
-        pass
+def player_worker(play_queue: "queue.Queue[str | None]") -> None:
+    """Drain the queue, playing each WAV synchronously and deleting it after."""
+    while True:
+        path = play_queue.get()
+        if path is None:
+            return
+        subprocess.run(["afplay", path], check=False)
+        try:
+            os.unlink(path)
+        except FileNotFoundError:
+            pass
 
 
 def split_into_chunks(text: str, max_chars: int) -> list[str]:
@@ -159,25 +164,23 @@ def main() -> None:
     if not chunks:
         return
 
+    # Pipeline synthesis and playback so audio starts as soon as the first
+    # chunk is ready instead of waiting for the entire response to finish.
+    play_queue: "queue.Queue[str | None]" = queue.Queue()
+    player = threading.Thread(target=player_worker, args=(play_queue,), daemon=False)
+    player.start()
+
     model = load_model(MODEL_ID)
-    audio_pieces: list[np.ndarray] = []
-    sample_rate: int | None = None
     for chunk in chunks:
         for result in model.generate(
             text=chunk, voice=VOICE, speed=SPEED, lang_code=LANG
         ):
-            audio_pieces.append(result.audio)
-            sample_rate = result.sample_rate
+            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
+                sf.write(f.name, result.audio, result.sample_rate)
+                path = f.name
+            play_queue.put(path)
 
-    if not audio_pieces or sample_rate is None:
-        return
-
-    audio = np.concatenate(audio_pieces)
-    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
-        sf.write(f.name, audio, sample_rate)
-        threading.Thread(
-            target=play_and_cleanup, args=(f.name,), daemon=False
-        ).start()
+    play_queue.put(None)
 
 
 if __name__ == "__main__":
