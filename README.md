@@ -125,7 +125,7 @@ The dispatcher:
    - Terminates any in-progress playback from a previous hook so a fresh response replaces (not overlaps with) the older one (single-flight via process-group `killpg`)
    - Strips Markdown (code blocks, tables, URLs, parentheses, etc.)
    - Replaces common technical terms with katakana via a built-in dictionary; falls back to `alkana` for the rest
-   - Splits the text on sentence/clause boundaries because Kokoro truncates input at 510 phonemes per inference
+   - Splits the text on **paragraph boundaries first** (every blank line in Markdown forces a chunk break so the spoken cadence follows the writer's intended pauses), then on sentence/clause boundaries within each paragraph (Kokoro truncates input at 510 phonemes per inference)
    - Picks a playback speed by interpolating between `SPEED_MIN` and `SPEED_MAX` based on the chunk count — short replies stay natural, long multi-chunk responses get a moderate speed-up
    - Synthesizes each chunk with Kokoro (`jf_alpha`, the highest-rated Japanese voice) and pushes the WAV path onto a playback queue so audio starts as soon as the first chunk is ready (synthesis and playback run in parallel)
    - A player thread drains the queue, plays each WAV with macOS `afplay` in order, and deletes the temp files
