@@ -38,16 +38,6 @@
     ],
     "Notification": [
       {
-        "matcher": "idle_prompt",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/dispatch.sh\" \"お待ちしています。\"",
-            "async": true
-          }
-        ]
-      },
-      {
         "matcher": "permission_prompt",
         "hooks": [
           {
