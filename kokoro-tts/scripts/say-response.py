@@ -203,25 +203,12 @@ def split_into_chunks(text: str, max_chars: int) -> list[str]:
     return chunks
 
 
-FIXED_MESSAGES = {
-    "PermissionRequest": "承認待ちです。",
-    # Only the `idle_prompt` Notification subtype is wired up in hooks.json,
-    # so this fixed phrase is appropriate for every Notification we see.
-    "Notification": "お待ちしています。",
-}
-
-
 def main() -> None:
     data = json.load(sys.stdin)
-    hook_event = data.get("hook_event_name", "")
-    fixed = FIXED_MESSAGES.get(hook_event)
-    if fixed is not None:
-        # System events carry English `message` payloads. Speak a fixed
-        # Japanese phrase instead so it is intelligible.
-        text = fixed
-    else:
-        # Stop / StopFailure carry `last_assistant_message`.
-        text = data.get("last_assistant_message") or ""
+    # dispatch.sh injects fixed Japanese phrases into `last_assistant_message`
+    # for Notification subtypes whose system payload would otherwise be
+    # unintelligible aloud, so we just read whatever lands in that field.
+    text = data.get("last_assistant_message") or ""
     if not text:
         return
 
