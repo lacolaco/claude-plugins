@@ -36,7 +36,7 @@ LATER_CHUNK_MAX = 250
 # Long replies get sped up so multi-paragraph answers don't drag. The threshold
 # is chunk-count based because chunk size is bounded above, so chunk count is
 # a fair proxy for total speaking time.
-FAST_SPEED_CHUNK_THRESHOLD = 5
+FAST_SPEED_CHUNK_THRESHOLD = 4
 FAST_SPEED_SCALE = 1.2
 
 PIDFILE = os.path.expanduser("~/.claude/session-tts/playback.pid")
@@ -58,9 +58,19 @@ def _strip_inline_markdown(text: str) -> str:
     return " ".join(text.split()).strip()
 
 
+_LIST_ITEM_RE = re.compile(r"^([-*+]\s+|\d+\.\s+)(.*)")
+# Endings that already provide a natural pause — no need to append a period.
+_TERMINAL_PUNCT = ("。", "．", "！", "？", "!", "?", ".", "、", "，", ",")
+
+
 def clean(text: str) -> str:
-    """Strip Markdown but preserve paragraph breaks as `\n\n` so the chunker
-    can use them as forced boundaries."""
+    """Strip Markdown and emit paragraphs separated by `\n\n`.
+
+    List items keep their source paragraph (no extra `\n\n`) so playback
+    flows naturally; instead each item gets a trailing `。` if it lacks
+    one, which gives the synthesizer a clause-level pause between items
+    without the longer paragraph-level gap.
+    """
     paragraphs = re.split(r"\n[ \t]*\n+", text)
     out: list[str] = []
     in_code = False
@@ -82,9 +92,15 @@ def clean(text: str) -> str:
                 continue
             if s.startswith("---") or s.startswith(":--"):
                 continue
-            s = re.sub(r"^[-*+]\s+", "", s)
-            s = re.sub(r"^\d+\.\s+", "", s)
-            if s:
+            list_match = _LIST_ITEM_RE.match(s)
+            if list_match:
+                item_text = list_match.group(2).strip()
+                if not item_text:
+                    continue
+                if not item_text.endswith(_TERMINAL_PUNCT):
+                    item_text += "。"
+                cleaned.append(item_text)
+            elif s:
                 cleaned.append(s)
         if not cleaned:
             continue
@@ -190,6 +206,10 @@ def synth_chunk(
     query = q.json()
     if speed_scale != 1.0:
         query["speedScale"] = speed_scale
+    # Pad each chunk's leading silence so afplay's device-open transient lands
+    # inside the silence rather than over the first phoneme. Default 0.1s is
+    # too short for that on Bluetooth output.
+    query["prePhonemeLength"] = 0.5
     s = client.post(
         "/synthesis",
         params={"speaker": speaker_id},
