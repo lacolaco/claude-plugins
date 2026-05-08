@@ -117,9 +117,9 @@ Each hook calls `scripts/dispatch.sh`, which:
 3. Forwards the JSON to `scripts/say-response.py`, which:
    - Strips Markdown (code blocks, tables, URLs, parentheses, etc.)
    - Replaces common technical terms with katakana via a built-in dictionary; falls back to `alkana` for the rest
-   - Splits the text on sentence/clause boundaries because Kokoro truncates input at 510 phonemes per inference; long responses are synthesized chunk by chunk and concatenated
-   - Synthesizes audio with Kokoro (`jf_alpha`, the highest-rated Japanese voice)
-   - Plays the WAV with macOS `afplay` and deletes the temp file
+   - Splits the text on sentence/clause boundaries because Kokoro truncates input at 510 phonemes per inference
+   - Synthesizes each chunk with Kokoro (`jf_alpha`, the highest-rated Japanese voice) and pushes the WAV path onto a playback queue so audio starts as soon as the first chunk is ready (synthesis and playback run in parallel)
+   - A player thread drains the queue, plays each WAV with macOS `afplay` in order, and deletes the temp files
 
 The Python runtime is isolated under `python/` and managed by `uv`; the hook calls `uv run --directory ${CLAUDE_PLUGIN_ROOT}/python`.
 
