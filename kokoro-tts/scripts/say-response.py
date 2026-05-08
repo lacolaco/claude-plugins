@@ -10,6 +10,7 @@ import threading
 import warnings
 
 import alkana
+import numpy as np
 import soundfile as sf
 from mlx_audio.tts.utils import load_model
 
@@ -19,7 +20,12 @@ MODEL_ID = "mlx-community/Kokoro-82M-bf16"
 VOICE = "jf_alpha"
 SPEED = 1.2
 LANG = "j"
-MAX_TEXT_LENGTH = 1000
+MAX_TEXT_LENGTH = 2000
+# Kokoro truncates input at 510 phonemes per inference, so we synthesize in
+# smaller chunks (split on sentence/clause boundaries) and concatenate the
+# audio. Japanese averages around 2 phonemes per character, so cap each chunk
+# well under the 510-phoneme ceiling.
+MAX_CHARS_PER_CHUNK = 180
 
 CUSTOM = {
     "API": "エーピーアイ",
@@ -100,6 +106,41 @@ def play_and_cleanup(path: str) -> None:
         pass
 
 
+def split_into_chunks(text: str, max_chars: int) -> list[str]:
+    """Split on sentence and clause boundaries, packing as much as fits.
+
+    Falls back to hard-cutting at max_chars when a single clause is still
+    longer than the limit, so no chunk ever exceeds max_chars.
+    """
+    parts = re.split(r"(?<=[。．！？!?、，,])\s*", text)
+    chunks: list[str] = []
+    current = ""
+
+    def flush() -> None:
+        nonlocal current
+        if current:
+            chunks.append(current)
+            current = ""
+
+    for part in parts:
+        if not part:
+            continue
+        if len(part) > max_chars:
+            flush()
+            for i in range(0, len(part), max_chars):
+                chunks.append(part[i : i + max_chars])
+            continue
+        if not current:
+            current = part
+        elif len(current) + len(part) <= max_chars:
+            current += part
+        else:
+            flush()
+            current = part
+    flush()
+    return chunks
+
+
 def main() -> None:
     data = json.load(sys.stdin)
     # Stop / StopFailure carry `last_assistant_message`; Notification carries `message`.
@@ -113,15 +154,26 @@ def main() -> None:
 
     text = en_to_kana(text)
 
-    model = load_model(MODEL_ID)
-    result = next(
-        model.generate(text=text, voice=VOICE, speed=SPEED, lang_code=LANG), None
-    )
-    if result is None:
+    chunks = split_into_chunks(text, MAX_CHARS_PER_CHUNK)
+    if not chunks:
         return
 
+    model = load_model(MODEL_ID)
+    audio_pieces: list[np.ndarray] = []
+    sample_rate: int | None = None
+    for chunk in chunks:
+        for result in model.generate(
+            text=chunk, voice=VOICE, speed=SPEED, lang_code=LANG
+        ):
+            audio_pieces.append(result.audio)
+            sample_rate = result.sample_rate
+
+    if not audio_pieces or sample_rate is None:
+        return
+
+    audio = np.concatenate(audio_pieces)
     with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
-        sf.write(f.name, result.audio, result.sample_rate)
+        sf.write(f.name, audio, sample_rate)
         threading.Thread(
             target=play_and_cleanup, args=(f.name,), daemon=False
         ).start()

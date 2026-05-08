@@ -117,6 +117,7 @@ Each hook calls `scripts/dispatch.sh`, which:
 3. Forwards the JSON to `scripts/say-response.py`, which:
    - Strips Markdown (code blocks, tables, URLs, parentheses, etc.)
    - Replaces common technical terms with katakana via a built-in dictionary; falls back to `alkana` for the rest
+   - Splits the text on sentence/clause boundaries because Kokoro truncates input at 510 phonemes per inference; long responses are synthesized chunk by chunk and concatenated
    - Synthesizes audio with Kokoro (`jf_alpha`, the highest-rated Japanese voice)
    - Plays the WAV with macOS `afplay` and deletes the temp file
 
@@ -144,7 +145,8 @@ Edit constants at the top of `kokoro-tts/scripts/say-response.py`:
 | `MODEL_ID` | `mlx-community/Kokoro-82M-bf16` | HuggingFace model id |
 | `VOICE` | `jf_alpha` | Japanese voice (also available: `jf_gongitsune`, `jf_tebukuro`, `jf_nezumi`, `jm_kumo`) |
 | `SPEED` | `1.2` | Playback speed |
-| `MAX_TEXT_LENGTH` | `1000` | Truncate long responses |
+| `MAX_TEXT_LENGTH` | `2000` | Truncate very long responses (after Markdown stripping) |
+| `MAX_CHARS_PER_CHUNK` | `180` | Per-inference chunk size (must keep phoneme count under Kokoro's 510 ceiling) |
 
 Add domain terms to the `CUSTOM` dictionary for better katakana pronunciation.
 
