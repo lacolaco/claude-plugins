@@ -1,0 +1,11 @@
+{
+  "name": "kokoro-tts",
+  "description": "Read Claude Code responses aloud locally using Kokoro TTS via mlx-audio. Apple Silicon only, Japanese voice.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Suguru Inatomi"
+  },
+  "repository": "https://github.com/lacolaco/claude-plugins",
+  "license": "MIT",
+  "keywords": ["tts", "voice", "japanese", "kokoro", "mlx-audio", "macos", "apple-silicon"]
+}

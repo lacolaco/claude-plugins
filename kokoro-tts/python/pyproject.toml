@@ -1,0 +1,15 @@
+[project]
+name = "kokoro-tts-runtime"
+version = "1.0.0"
+description = "Kokoro TTS runtime via mlx-audio for Apple Silicon"
+requires-python = ">=3.12"
+dependencies = [
+    "mlx-audio>=0.4.1",
+    "misaki[ja]==0.7.4",
+    "soundfile>=0.13.1",
+    "num2words",
+    "spacy",
+    "phonemizer",
+    "espeakng-loader",
+    "alkana>=0.0.3",
+]
