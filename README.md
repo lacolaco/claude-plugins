@@ -9,7 +9,7 @@ Claude Code plugins by lacolaco.
 | [protect-main-branch](./protect-main-branch) | Prevent direct edits and pushes to the main branch (configurable) |
 | [session-handover](./session-handover) | Session handover/takeover for task continuity between sessions |
 | [retrospective](./retrospective) | Structured 6-stage retrospective for tasks, PRs, and incidents |
-| [kokoro-tts](./kokoro-tts) | Read Claude Code responses aloud locally using Kokoro TTS via mlx-audio. ON by default per session (Apple Silicon, Japanese voice) |
+| [session-tts](./session-tts) | Read Claude Code responses aloud locally with a different Japanese voice per session. ON by default; engine and voices are managed automatically (Apple Silicon) |
 
 ## protect-main-branch
 
@@ -98,86 +98,71 @@ All retrospective outcomes are written to workspace-local locations only — the
 /plugin install retrospective@lacolaco-plugins
 ```
 
-## kokoro-tts
+## session-tts
 
-Reads Claude Code's responses aloud on your machine using [Kokoro TTS](https://huggingface.co/hexgrad/Kokoro-82M) via [mlx-audio](https://github.com/ml-explore/mlx-audio). Inference runs locally; no external API calls during playback. Playback is on by default for every new session, scoped to that session, so concurrent Claude Code sessions do not speak over each other and any session can be silenced individually.
+Reads Claude Code's responses aloud on your local machine. Each Claude Code session is automatically assigned one of three different Japanese voices in a fixed rotation, so when several sessions are running you can tell them apart by voice. Synthesis happens locally; no external API is called during playback.
 
 ### How it works
 
 The plugin subscribes to four hook events:
 
-- **`SessionStart`** — fires at session start (`startup`, `resume`, `clear`, `compact`); creates the per-session flag at `~/.claude/kokoro-tts/sessions/$session_id` so the session speaks by default. `touch` is idempotent, so re-firing on `clear`/`compact` is safe; if you had silenced a session with `/kokoro-tts:voice off` and then run `/clear`, the flag is recreated and the session goes back to ON.
-- **`Stop`** — fires when Claude finishes a normal response; reads `last_assistant_message`
-- **`StopFailure`** — fires when the turn ends due to an API error; reads `last_assistant_message`
+- **`SessionStart`** — assigns this session a voice from the 3-slot rotation (the assignment is stored at `~/.claude/session-tts/sessions/$session_id` and stays stable across `clear`/`compact` re-fires). It also kicks off a background engine bootstrap that is idempotent: typical re-runs do nothing.
+- **`Stop`** — fires when Claude finishes a normal response; speaks `last_assistant_message`
+- **`StopFailure`** — fires when the turn ends due to an API error; speaks `last_assistant_message`
 - **`Notification`** with two matchers:
   - `idle_prompt` — Claude Code is idle waiting for input → speaks 「お待ちしています。」
   - `permission_prompt` — a tool needs approval → speaks 「承認待ちです。」
 
   (Other Notification subtypes such as `auth_success` and `elicitation_*` are intentionally not subscribed.)
 
-`SessionStart` calls `scripts/session-on.sh`, which just creates the per-session flag file. The other hooks call `scripts/dispatch.sh`. For Notification matchers a fixed Japanese phrase is passed as the first argument; the dispatcher then injects it into `last_assistant_message` before forwarding (the system payload would otherwise be unintelligible English/freeform).
+On the first session ever, the SessionStart hook downloads the local TTS engine binary into `~/.claude/session-tts/engine/` and installs the three voice models. From then on it just probes the engine's health endpoint (sub-100 ms) and exits.
 
 The dispatcher:
 
 1. Reads the hook input JSON from stdin and extracts `session_id`
-2. Skips silently unless `~/.claude/kokoro-tts/sessions/<session_id>` exists (per-session flag)
-3. Optionally overrides `last_assistant_message` with the fixed phrase argument
-4. Forwards the JSON to `scripts/say-response.py`, which:
+2. Skips silently if the session has no voice assigned, or if `~/.claude/session-tts/silenced/<session_id>` exists (the user turned voice off for this session)
+3. Optionally overrides `last_assistant_message` with a fixed phrase (used by Notification matchers)
+4. Forwards the JSON to `scripts/say-response.py` along with the per-session speaker id, which:
    - Terminates any in-progress playback from a previous hook so a fresh response replaces (not overlaps with) the older one (single-flight via process-group `killpg`)
    - Strips Markdown (code blocks, tables, URLs, parentheses, etc.)
-   - Replaces common technical terms with katakana via a built-in dictionary; falls back to `alkana` for the rest
-   - Splits the text on **paragraph boundaries first** (every blank line in Markdown forces a chunk break so the spoken cadence follows the writer's intended pauses), then on sentence/clause boundaries within each paragraph (Kokoro truncates input at 510 phonemes per inference)
-   - Picks a playback speed by interpolating between `SPEED_MIN` and `SPEED_MAX` based on the chunk count — short replies stay natural, long multi-chunk responses get a moderate speed-up
-   - Synthesizes each chunk with Kokoro (`jf_alpha`, the highest-rated Japanese voice) and pushes the WAV path onto a playback queue so audio starts as soon as the first chunk is ready (synthesis and playback run in parallel)
+   - Splits the text on **paragraph boundaries first**, then sentence/clause boundaries inside each paragraph. The first chunk is intentionally small (≤ 40 chars) so the first audible word arrives quickly even on long responses; later chunks are larger (≤ 100 chars) for natural cadence.
+   - Synthesizes chunks via the local engine's HTTP API over a keep-alive `httpx.Client` and pushes each WAV onto a playback queue so audio starts as soon as the first chunk is ready (synthesis and playback run in parallel)
    - A player thread drains the queue, plays each WAV with macOS `afplay` in order, and deletes the temp files
 
 The Python runtime is isolated under `python/` and managed by `uv`; the hook calls `uv run --directory ${CLAUDE_PLUGIN_ROOT}/python`.
 
 ### Toggle voice playback
 
-Voice is ON by default in every new session (created by the `SessionStart` hook). Use the `/kokoro-tts:voice` skill to override that for the current session:
+Voice is ON by default in every new session. Use the `/session-tts:tts` skill to override:
 
 ```
-/kokoro-tts:voice off     # silence THIS session
-/kokoro-tts:voice on      # re-enable after off (also works the first time if SessionStart didn't fire)
-/kokoro-tts:voice toggle  # flip
-/kokoro-tts:voice status  # show current state (default)
+/session-tts:tts off     # silence THIS session
+/session-tts:tts on      # re-enable
+/session-tts:tts toggle  # flip
+/session-tts:tts status  # show current state (default)
 ```
 
-The skill writes to `~/.claude/kokoro-tts/sessions/$CLAUDE_CODE_SESSION_ID`, so each session is independent. Other concurrent sessions are unaffected.
-
-> Note: running `/clear` or `/compact` re-fires `SessionStart` and recreates the flag, so a session previously silenced with `voice off` will go back to ON. Run `voice off` again after the clear/compact if you want it to stay silent.
-
-### Customize the voice
-
-Edit constants at the top of `kokoro-tts/scripts/say-response.py`:
-
-| Constant | Default | Notes |
-|---|---|---|
-| `MODEL_ID` | `mlx-community/Kokoro-82M-bf16` | HuggingFace model id |
-| `VOICE` | `jf_alpha` | Japanese voice (also available: `jf_gongitsune`, `jf_tebukuro`, `jf_nezumi`, `jm_kumo`) |
-| `SPEED_MIN` / `SPEED_MAX` | `1.2` / `1.5` | Playback speed range; the actual speed is interpolated by chunk count |
-| `SPEED_CHUNKS_FLOOR` / `SPEED_CHUNKS_CEILING` | `1` / `8` | Chunk-count thresholds for the speed interpolation |
-| `MAX_TEXT_LENGTH` | `2000` | Truncate very long responses (after Markdown stripping) |
-| `MAX_CHARS_PER_CHUNK` | `180` | Per-inference chunk size (must keep phoneme count under Kokoro's 510 ceiling) |
-
-Add domain terms to the `CUSTOM` dictionary for better katakana pronunciation.
+The skill toggles `~/.claude/session-tts/silenced/$CLAUDE_CODE_SESSION_ID` and is independent of the voice assignment, so silencing then re-enabling preserves the same voice. Other concurrent sessions are unaffected.
 
 ### Installation
 
 ```
 /plugin marketplace add lacolaco/claude-plugins
-/plugin install kokoro-tts@lacolaco-plugins
+/plugin install session-tts@lacolaco-plugins
 ```
 
-After installing, every new session speaks by default. Use `/kokoro-tts:voice off` to silence a particular session.
+After installing, every new session speaks by default with a rotating voice. Use `/session-tts:tts off` to silence a particular session.
 
 ### Prerequisites
 
 - macOS on Apple Silicon (M1+)
-- [`uv`](https://docs.astral.sh/uv/) on `PATH` (the plugin uses `uv run --directory`)
-- `jq` on `PATH` (used by the dispatcher to read `session_id` from hook input)
-- First run downloads the Kokoro model (~355 MB) from HuggingFace
+- [`uv`](https://docs.astral.sh/uv/) on `PATH`
+- `jq` on `PATH`
+- Internet access on the **first** SessionStart only — to fetch the engine binary (~200 MB) and the three voice models (~50 MB total). Subsequent sessions run fully offline.
+
+### Voices and licensing
+
+The bundled voices are licensed under [ACML 1.0](https://aivm-specs.aivis-project.com/license/acml/) and downloaded from [AivisHub](https://hub.aivis-project.com/) on first use. ACML 1.0 permits personal use with credit; check the per-voice terms on AivisHub before any other use (commercial use, redistribution, derivative works, etc).
 
 ## License
 
