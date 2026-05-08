@@ -58,30 +58,7 @@ CUSTOM = {
 _CUSTOM_SORTED = sorted(CUSTOM.items(), key=lambda x: -len(x[0]))
 
 
-def clean(text: str) -> str:
-    lines = text.split("\n")
-    cleaned = []
-    in_code = False
-    for line in lines:
-        s = line.strip()
-        if s.startswith("```"):
-            in_code = not in_code
-            continue
-        if in_code:
-            continue
-        if s.startswith("$ ") or s.startswith("> "):
-            continue
-        if line.startswith("    ") and s:
-            continue
-        if "|" in s:
-            continue
-        if s.startswith("---") or s.startswith(":--"):
-            continue
-        s = re.sub(r"^[-*+]\s+", "", s)
-        s = re.sub(r"^\d+\.\s+", "", s)
-        if s:
-            cleaned.append(s)
-    text = " ".join(cleaned)
+def _strip_inline_markdown(text: str) -> str:
     text = re.sub(r"\*\*([^*]+)\*\*", r"\1", text)
     text = re.sub(r"\*([^*]+)\*", r"\1", text)
     for ch in ["#", "`", ">"]:
@@ -91,8 +68,48 @@ def clean(text: str) -> str:
     text = re.sub(r"【[^】]*】", "", text)
     text = re.sub(r"\[[^\]]*\]", "", text)
     text = re.sub(r"https?://\S+", "", text)
-    text = " ".join(text.split()).strip()
-    return text[:MAX_TEXT_LENGTH]
+    return " ".join(text.split()).strip()
+
+
+def clean(text: str) -> str:
+    """Strip Markdown but preserve paragraph breaks as `\n\n`.
+
+    Downstream chunking uses these paragraph boundaries as forced split
+    points so playback follows the writer's intended pauses instead of
+    running every paragraph together.
+    """
+    paragraphs = re.split(r"\n[ \t]*\n+", text)
+    cleaned_paragraphs: list[str] = []
+    in_code = False  # carries across paragraphs since fences need not be
+                     # surrounded by blank lines
+    for paragraph in paragraphs:
+        lines = paragraph.split("\n")
+        cleaned_lines: list[str] = []
+        for line in lines:
+            s = line.strip()
+            if s.startswith("```"):
+                in_code = not in_code
+                continue
+            if in_code:
+                continue
+            if s.startswith("$ ") or s.startswith("> "):
+                continue
+            if line.startswith("    ") and s:
+                continue
+            if "|" in s:
+                continue
+            if s.startswith("---") or s.startswith(":--"):
+                continue
+            s = re.sub(r"^[-*+]\s+", "", s)
+            s = re.sub(r"^\d+\.\s+", "", s)
+            if s:
+                cleaned_lines.append(s)
+        if not cleaned_lines:
+            continue
+        merged = _strip_inline_markdown(" ".join(cleaned_lines))
+        if merged:
+            cleaned_paragraphs.append(merged)
+    return "\n\n".join(cleaned_paragraphs)[:MAX_TEXT_LENGTH]
 
 
 def en_to_kana(text: str) -> str:
@@ -168,8 +185,8 @@ def adaptive_speed(num_chunks: int) -> float:
     return SPEED_MIN + ratio * (SPEED_MAX - SPEED_MIN)
 
 
-def split_into_chunks(text: str, max_chars: int) -> list[str]:
-    """Split on sentence and clause boundaries, packing as much as fits.
+def _split_paragraph(text: str, max_chars: int) -> list[str]:
+    """Split a single paragraph on sentence/clause boundaries.
 
     Falls back to hard-cutting at max_chars when a single clause is still
     longer than the limit, so no chunk ever exceeds max_chars.
@@ -200,6 +217,23 @@ def split_into_chunks(text: str, max_chars: int) -> list[str]:
             flush()
             current = part
     flush()
+    return chunks
+
+
+def split_into_chunks(text: str, max_chars: int) -> list[str]:
+    """Force a chunk boundary on every paragraph break, then split each
+    paragraph on sentence/clause boundaries inside it.
+
+    Paragraph breaks are the writer's intended pauses, so honoring them
+    keeps the spoken cadence natural instead of running paragraphs into
+    each other.
+    """
+    chunks: list[str] = []
+    for paragraph in text.split("\n\n"):
+        paragraph = paragraph.strip()
+        if not paragraph:
+            continue
+        chunks.extend(_split_paragraph(paragraph, max_chars))
     return chunks
 
 
