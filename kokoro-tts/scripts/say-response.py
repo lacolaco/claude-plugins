@@ -19,7 +19,7 @@ MODEL_ID = "mlx-community/Kokoro-82M-bf16"
 VOICE = "jf_alpha"
 SPEED = 1.2
 LANG = "j"
-MAX_TEXT_LENGTH = 600
+MAX_TEXT_LENGTH = 1000
 
 CUSTOM = {
     "API": "エーピーアイ",

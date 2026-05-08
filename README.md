@@ -144,7 +144,7 @@ Edit constants at the top of `kokoro-tts/scripts/say-response.py`:
 | `MODEL_ID` | `mlx-community/Kokoro-82M-bf16` | HuggingFace model id |
 | `VOICE` | `jf_alpha` | Japanese voice (also available: `jf_gongitsune`, `jf_tebukuro`, `jf_nezumi`, `jm_kumo`) |
 | `SPEED` | `1.2` | Playback speed |
-| `MAX_TEXT_LENGTH` | `600` | Truncate long responses |
+| `MAX_TEXT_LENGTH` | `1000` | Truncate long responses |
 
 Add domain terms to the `CUSTOM` dictionary for better katakana pronunciation.
 
