@@ -107,18 +107,28 @@ def ensure_engine_running(boot_timeout: float = 30.0) -> None:
     log("starting TTS engine...")
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     log_fh = ENGINE_LOG.open("ab")
+    cmd = [
+        str(ENGINE_BIN),
+        "--host",
+        ENGINE_HOST,
+        "--port",
+        str(ENGINE_PORT),
+        "--no-use_gpu",
+        "--output_log_utf8",
+        "--disable_sentry",
+    ]
+    # Boost the engine's scheduling priority on macOS so CPU pressure from
+    # other busy processes doesn't perturb its inference threads. Without
+    # this, output waveforms drift slightly under load because tensor-op
+    # scheduling becomes non-deterministic. taskpolicy ships with macOS and
+    # doesn't need sudo. -t 0 / -l 0 set the highest throughput / latency
+    # tiers for the process.
+    taskpolicy = shutil.which("taskpolicy")
+    if taskpolicy:
+        cmd = [taskpolicy, "-t", "0", "-l", "0", *cmd]
     # Detach from this process so the engine outlives the SessionStart hook.
     proc = subprocess.Popen(
-        [
-            str(ENGINE_BIN),
-            "--host",
-            ENGINE_HOST,
-            "--port",
-            str(ENGINE_PORT),
-            "--no-use_gpu",
-            "--output_log_utf8",
-            "--disable_sentry",
-        ],
+        cmd,
         stdout=log_fh,
         stderr=log_fh,
         stdin=subprocess.DEVNULL,
