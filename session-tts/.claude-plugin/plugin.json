@@ -1,0 +1,11 @@
+{
+  "name": "session-tts",
+  "description": "Read Claude Code responses aloud locally with a different Japanese voice per session. ON by default; engine and models are managed automatically. Apple Silicon only.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Suguru Inatomi"
+  },
+  "repository": "https://github.com/lacolaco/claude-plugins",
+  "license": "MIT",
+  "keywords": ["tts", "voice", "japanese", "session", "macos", "apple-silicon"]
+}

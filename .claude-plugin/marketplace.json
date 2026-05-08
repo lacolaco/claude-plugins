@@ -24,10 +24,10 @@
       "source": "./retrospective"
     },
     {
-      "name": "kokoro-tts",
-      "description": "Read Claude Code responses aloud locally using Kokoro TTS via mlx-audio. ON by default per session. Apple Silicon only, Japanese voice.",
-      "version": "1.2.0",
-      "source": "./kokoro-tts"
+      "name": "session-tts",
+      "description": "Read Claude Code responses aloud locally with a different Japanese voice per session. ON by default; engine and models are managed automatically. Apple Silicon only.",
+      "version": "0.1.0",
+      "source": "./session-tts"
     }
   ]
 }
