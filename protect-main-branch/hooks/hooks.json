@@ -27,7 +27,6 @@
           {
             "type": "command",
             "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/protect-main-branch.sh\"",
-            "if": "Bash(git push:*)",
             "timeout": 5
           }
         ]

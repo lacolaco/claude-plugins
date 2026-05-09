@@ -12,19 +12,35 @@ case " $protected_branches " in
   *) exit 0 ;;
 esac
 
-# For Write/Edit: only block tracked (non-ignored) files within the repo
-file_path=$(jq -r '.tool_input.file_path // empty')
-if [ -n "$file_path" ]; then
-  repo_dir=$(git rev-parse --show-toplevel 2>/dev/null)
-  case "$file_path" in
-    "$repo_dir"/*) ;;
-    *) exit 0 ;;
-  esac
-  # Allow editing gitignored files
-  if git check-ignore -q "$file_path" 2>/dev/null; then
+input=$(cat)
+tool_name=$(printf '%s' "$input" | jq -r '.tool_name // empty')
+
+case "$tool_name" in
+  Write|Edit)
+    file_path=$(printf '%s' "$input" | jq -r '.tool_input.file_path // empty')
+    [ -z "$file_path" ] && exit 0
+    repo_dir=$(git rev-parse --show-toplevel 2>/dev/null)
+    case "$file_path" in
+      "$repo_dir"/*) ;;
+      *) exit 0 ;;
+    esac
+    # Allow editing gitignored files
+    if git check-ignore -q "$file_path" 2>/dev/null; then
+      exit 0
+    fi
+    ;;
+  Bash)
+    command=$(printf '%s' "$input" | jq -r '.tool_input.command // empty')
+    # Only block git push commands; allow everything else (incl. ops outside the repo)
+    case "$command" in
+      *"git push"*) ;;
+      *) exit 0 ;;
+    esac
+    ;;
+  *)
     exit 0
-  fi
-fi
+    ;;
+esac
 
 jq -n --arg branch "$branch" '{
   hookSpecificOutput: {
