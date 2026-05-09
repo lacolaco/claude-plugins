@@ -27,6 +27,7 @@ import httpx
 
 ENGINE_BASE_URL = os.environ.get("SESSION_TTS_ENGINE_URL", "http://127.0.0.1:10101")
 SPEAKER_ID = int(os.environ.get("SESSION_TTS_SPEAKER_ID", "0"))
+SESSION_ID = os.environ.get("SESSION_TTS_SESSION_ID", "")
 
 MAX_TEXT_LENGTH = 2000
 # Engine docs recommend keeping each /synthesis call under 500 chars and
@@ -51,7 +52,14 @@ FAST_SPEED_SCALE = 1.2
 MAX_CHUNKS = 8
 TRUNCATION_NOTICE = "以下、省略します。"
 
-PIDFILE = os.path.expanduser("~/.claude/session-tts/playback.pid")
+# Per-session pidfile: a new utterance only preempts a still-playing
+# utterance from the SAME session. Other concurrent sessions keep their
+# audio. The whole point of the per-session voice rotation is that
+# parallel sessions can be told apart by ear; a global single-flight
+# would make that pointless by silencing every session except the
+# most recent one.
+PIDFILE_DIR = os.path.expanduser("~/.claude/session-tts/playback")
+PIDFILE = os.path.join(PIDFILE_DIR, SESSION_ID) if SESSION_ID else ""
 
 
 # --- text cleanup ----------------------------------------------------------
@@ -183,6 +191,8 @@ def split_into_chunks(text: str) -> list[str]:
 
 
 def kill_previous_playback() -> None:
+    if not PIDFILE:
+        return
     try:
         with open(PIDFILE) as f:
             old_pgid = int(f.read().strip())
@@ -196,12 +206,16 @@ def kill_previous_playback() -> None:
 
 def register_self() -> None:
     os.setpgrp()
+    if not PIDFILE:
+        return
     os.makedirs(os.path.dirname(PIDFILE), exist_ok=True)
     with open(PIDFILE, "w") as f:
         f.write(str(os.getpid()))
 
 
 def clear_self() -> None:
+    if not PIDFILE:
+        return
     try:
         with open(PIDFILE) as f:
             recorded = int(f.read().strip())

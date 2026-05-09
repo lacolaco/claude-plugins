@@ -100,7 +100,7 @@ plugin_root="${CLAUDE_PLUGIN_ROOT}"
     python "$plugin_root/python/setup_engine.py"
   setup_status=$?
   if [ "$newly_assigned" = "1" ] && [ "$setup_status" = "0" ]; then
-    sid=$(resolve_speaker "$session_id") && speak_text "$sid" "TTSを開始します。"
+    sid=$(resolve_speaker "$session_id") && speak_text "$sid" "TTSを開始します。" "$session_id"
   fi
 } >> "$data_dir/setup.log" 2>&1 < /dev/null &
 disown
