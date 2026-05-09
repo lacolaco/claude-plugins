@@ -25,8 +25,8 @@
     },
     {
       "name": "session-tts",
-      "description": "Read Claude Code responses aloud locally with a different Japanese voice per session. ON by default; engine and models are managed automatically. Apple Silicon only.",
-      "version": "0.1.0",
+      "description": "Read Claude Code responses aloud locally with a different Japanese voice per session. Permission prompts include the workspace name in the narration. ON by default; engine and models are managed automatically. Apple Silicon only.",
+      "version": "0.2.0",
       "source": "./session-tts"
     }
   ]

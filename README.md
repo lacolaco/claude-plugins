@@ -9,7 +9,7 @@ Claude Code plugins by lacolaco.
 | [protect-main-branch](./protect-main-branch) | Prevent git operations that would modify the main branch (configurable) |
 | [session-handover](./session-handover) | Session handover/takeover for task continuity between sessions |
 | [retrospective](./retrospective) | Structured 6-stage retrospective for tasks, PRs, and incidents |
-| [session-tts](./session-tts) | Read Claude Code responses aloud locally with a different Japanese voice per session. ON by default; engine and voices are managed automatically (Apple Silicon) |
+| [session-tts](./session-tts) | Read Claude Code responses aloud locally with a different Japanese voice per session. Permission prompts include the workspace name. ON by default; engine and voices are managed automatically (Apple Silicon) |
 
 ## protect-main-branch
 
@@ -107,7 +107,7 @@ The plugin subscribes to four hook events:
 - **`SessionStart`** — assigns this session a voice from the 3-slot rotation (the assignment is stored at `~/.claude/session-tts/sessions/$session_id` and stays stable across `clear`/`compact` re-fires). It also kicks off a background engine bootstrap that is idempotent: typical re-runs do nothing.
 - **`Stop`** — fires when Claude finishes a normal response; speaks `last_assistant_message`
 - **`StopFailure`** — fires when the turn ends due to an API error; speaks `last_assistant_message`
-- **`Notification`** with the `permission_prompt` matcher only — a tool needs approval → speaks 「承認待ちです。」 (Other Notification subtypes including `idle_prompt` are intentionally not subscribed.)
+- **`Notification`** with the `permission_prompt` matcher only — a tool needs approval → speaks 「<workspace>で承認待ちです」, where `<workspace>` is the basename of `cwd` from the hook input (e.g. 「claude-pluginsで承認待ちです」). Falls back to 「承認待ちです。」 if `cwd` is missing. (Other Notification subtypes including `idle_prompt` are intentionally not subscribed.)
 
 On the first session ever, the SessionStart hook downloads the local TTS engine binary into `~/.claude/session-tts/engine/` and installs the three voice models. From then on it just probes the engine's health endpoint (sub-100 ms) and exits.
 

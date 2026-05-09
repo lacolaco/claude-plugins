@@ -42,7 +42,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/dispatch.sh\" \"承認待ちです。\"",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/notify-permission.sh\"",
             "async": true
           }
         ]
