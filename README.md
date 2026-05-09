@@ -6,28 +6,26 @@ Claude Code plugins by lacolaco.
 
 | Plugin | Description |
 |--------|-------------|
-| [protect-main-branch](./protect-main-branch) | Prevent direct edits and pushes to the main branch (configurable) |
+| [protect-main-branch](./protect-main-branch) | Prevent git operations that would modify the main branch (configurable) |
 | [session-handover](./session-handover) | Session handover/takeover for task continuity between sessions |
 | [retrospective](./retrospective) | Structured 6-stage retrospective for tasks, PRs, and incidents |
 | [session-tts](./session-tts) | Read Claude Code responses aloud locally with a different Japanese voice per session. ON by default; engine and voices are managed automatically (Apple Silicon) |
 
 ## protect-main-branch
 
-Blocks Write, Edit, and `git push` operations when on the protected branch (defaults to `main`) in Claude Code.
+Blocks git subcommands that would modify the protected branch (defaults to `main`) when checked out in Claude Code.
 
 ### How it works
 
 - On any branch other than the protected branch: no-op (all operations allowed)
-- On the protected branch:
-  - **Write/Edit**: Blocks editing tracked (non-gitignored) files within the repository
-  - **Bash**: Blocks `git push` commands
-  - Editing gitignored files is always allowed
-  - Editing files outside the repository is always allowed
+- On the protected branch: Bash commands invoking the following git subcommands are denied — `commit`, `push`, `merge`, `rebase`, `reset`, `cherry-pick`, `revert`, `am`. All other operations (Write, Edit, `git pull`, `git status`, `git switch`, etc.) pass through unchanged.
+
+`git pull` is intentionally allowed so the protected branch can be synced with its upstream. To introduce changes to the protected branch, do the work on a feature branch and merge it via a PR.
 
 When blocked, the hook returns:
 
 ```
-Cannot edit/push on <branch> branch. Create a feature branch first.
+Cannot run `git <subcommand>` on <branch> branch. Create a feature branch first.
 ```
 
 ### Configuration
