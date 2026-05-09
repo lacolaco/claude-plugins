@@ -9,7 +9,7 @@ Claude Code plugins by lacolaco.
 | [protect-main-branch](./protect-main-branch) | Prevent git operations that would modify the main branch (configurable) |
 | [session-handover](./session-handover) | Session handover/takeover for task continuity between sessions |
 | [retrospective](./retrospective) | Structured 6-stage retrospective for tasks, PRs, and incidents |
-| [session-tts](./session-tts) | Read Claude Code responses aloud locally with a different Japanese voice per session. Permission prompts include the workspace name. ON by default; engine and voices are managed automatically (Apple Silicon) |
+| [session-tts](./session-tts) | Read Claude Code responses aloud locally with a different Japanese voice per session. Adds the `/session-tts:say` skill for short mid-turn progress narration. Permission prompts include the workspace name. ON by default; engine and voices are managed automatically (Apple Silicon) |
 
 ## protect-main-branch
 
@@ -111,21 +111,50 @@ The plugin subscribes to four hook events:
 
 On the first session ever, the SessionStart hook downloads the local TTS engine binary into `~/.claude/session-tts/engine/` and installs the three voice models. From then on it just probes the engine's health endpoint (sub-100 ms) and exits.
 
-The dispatcher:
+### Architecture
 
-1. Reads the hook input JSON from stdin and extracts `session_id`
-2. Skips silently if the session has no voice assigned, or if `~/.claude/session-tts/silenced/<session_id>` exists (the user turned voice off for this session)
-3. Optionally overrides `last_assistant_message` with a fixed phrase (used by Notification matchers)
-4. Forwards the JSON to `scripts/say-response.py` along with the per-session speaker id, which:
-   - Terminates any in-progress playback from a previous hook so a fresh response replaces (not overlaps with) the older one (single-flight via process-group `killpg`)
-   - Strips Markdown (code blocks, tables, URLs, parentheses, etc.)
-   - Splits the text on **paragraph boundaries first**, then sentence/clause boundaries inside each paragraph. The first chunk is intentionally small (≤ 40 chars) so the first audible word arrives quickly even on long responses; later chunks are larger (≤ 100 chars) for natural cadence.
-   - Synthesizes chunks via the local engine's HTTP API over a keep-alive `httpx.Client` and pushes each WAV onto a playback queue so audio starts as soon as the first chunk is ready (synthesis and playback run in parallel)
-   - A player thread drains the queue, plays each WAV with macOS `afplay` in order, and deletes the temp files
+The plugin is structured around a single **core**, `scripts/say-response.py`, that takes plain UTF-8 text on stdin and a per-session voice via `SESSION_TTS_SPEAKER_ID` env. It:
 
-The Python runtime is isolated under `python/` and managed by `uv`; the hook calls `uv run --directory ${CLAUDE_PLUGIN_ROOT}/python`.
+- Terminates any in-progress playback from a previous invocation so a fresh utterance replaces (not overlaps with) the older one (single-flight via process-group `killpg`)
+- Strips Markdown (code blocks, tables, URLs, parentheses, etc.)
+- Splits text on **paragraph boundaries first**, then sentence/clause boundaries inside each paragraph. The first chunk is intentionally small (≤ 60 chars) so the first audible word arrives quickly even on long responses; later chunks are larger (≤ 250 chars) for natural cadence.
+- Synthesizes chunks via the local engine's HTTP API over a keep-alive `httpx.Client` and pushes each WAV onto a playback queue so audio starts as soon as the first chunk is ready (synthesis and playback run in parallel)
+- A player thread drains the queue, plays each WAV with macOS `afplay` in order, and deletes the temp files
 
-### Toggle voice playback
+Around the core are thin **adapters**, one per input source. Each adapter is responsible for whatever its own input contract dictates (hook payload schemas, notification fields, skill arguments) and ends with a plain-text call into the core via `scripts/lib/voice-context.sh`:
+
+| Adapter | Input source | Text |
+|---------|--------------|------|
+| `scripts/dispatch.sh` | Stop / StopFailure hook payload (stdin JSON) | `last_assistant_message` |
+| `scripts/notify-permission.sh` | Notification:permission_prompt payload | `<workspace>で承認待ちです。` |
+| `scripts/say-skill.sh` | `/session-tts:say` skill argument | the argument verbatim |
+
+The shared helper `scripts/lib/voice-context.sh` resolves the per-session speaker (or returns failure if the session has no voice or has been silenced) and forwards text to the core. Hook payload schemas never leak into the core.
+
+The Python runtime is isolated under `python/` and managed by `uv`; adapters call `uv run --directory ${CLAUDE_PLUGIN_ROOT}/python`.
+
+### Mid-turn narration: `/session-tts:say`
+
+In addition to the hook-triggered narration, the plugin exposes a model-invocable skill `/session-tts:say` that lets Claude speak Japanese phrases aloud as **verbal task-progress reports during autonomous, multi-step work**. The intent is to let the user follow Claude's progress by ear without reading every message.
+
+Suggested calling moments (delivered to Claude via SessionStart instruction injection):
+
+- **Task transitions** — finishing one task and moving on to the next
+- **Problems** — an unexpected obstacle, error, or blocker
+- **Important findings** — investigation surfaces a notable result
+- **Direction changes** — revising the plan or pivoting the approach
+
+The skill runs:
+
+```
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/say-skill.sh" "<japanese text>"
+```
+
+Constraints documented in the skill: under ~100 Japanese characters per call, one phrase per invocation, reported at milestones rather than at each tool call, and always opened with a brief lead-in phrase (枕詞) like 「報告です。」「問題発生です。」「発見です。」「方針転換です。」 so the listener can orient before the body. Not used for the final turn message (Stop already handles that).
+
+The plugin nudges Claude toward calling the skill via a SessionStart instruction injected through the hook's stdout, but actual frequency is up to model judgment. If TTS has been silenced for the session via `/session-tts:tts off`, the skill is a no-op.
+
+### Toggle voice playback: `/session-tts:tts`
 
 Voice is ON by default in every new session. Use the `/session-tts:tts` skill to override:
 
@@ -136,7 +165,7 @@ Voice is ON by default in every new session. Use the `/session-tts:tts` skill to
 /session-tts:tts status  # show current state (default)
 ```
 
-The skill toggles `~/.claude/session-tts/silenced/$CLAUDE_CODE_SESSION_ID` and is independent of the voice assignment, so silencing then re-enabling preserves the same voice. Other concurrent sessions are unaffected.
+The skill toggles `~/.claude/session-tts/silenced/$CLAUDE_CODE_SESSION_ID` and is independent of the voice assignment, so silencing then re-enabling preserves the same voice. Other concurrent sessions are unaffected. The same flag is honored by the `/session-tts:say` skill above.
 
 ### Installation
 

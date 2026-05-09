@@ -1,4 +1,9 @@
-"""Read Claude Code responses aloud via the local TTS engine.
+"""Speak text aloud via the local TTS engine.
+
+Core text→audio adapter. Receives the text to speak on stdin (plain UTF-8)
+and the per-session voice via the SESSION_TTS_SPEAKER_ID env var. Hook /
+notification / skill specifics live in caller-side adapters; this module
+knows nothing about hook payload shapes.
 
 Pipeline (synth and playback run in parallel):
   text → strip markdown → split into small chunks
@@ -9,7 +14,6 @@ quickly even on long responses.
 """
 from __future__ import annotations
 
-import json
 import os
 import queue
 import re
@@ -54,14 +58,18 @@ PIDFILE = os.path.expanduser("~/.claude/session-tts/playback.pid")
 
 
 def _strip_inline_markdown(text: str) -> str:
+    # Markdown image: drop entirely (alt text rarely speaks well).
+    text = re.sub(r"!\[[^\]]*\]\([^)]*\)", "", text)
+    # Markdown link: keep the label, drop the URL part.
+    text = re.sub(r"\[([^\]]+)\]\(([^)]*)\)", r"\1", text)
+    # Bold / italic / inline code: keep inner text, drop the markers only.
     text = re.sub(r"\*\*([^*]+)\*\*", r"\1", text)
     text = re.sub(r"\*([^*]+)\*", r"\1", text)
-    for ch in ["#", "`", ">"]:
+    text = re.sub(r"`([^`]+)`", r"\1", text)
+    # Heading and blockquote markers.
+    for ch in ["#", ">"]:
         text = text.replace(ch, "")
-    text = re.sub(r"（[^）]*）", "", text)
-    text = re.sub(r"\([^)]*\)", "", text)
-    text = re.sub(r"【[^】]*】", "", text)
-    text = re.sub(r"\[[^\]]*\]", "", text)
+    # Bare URLs that aren't part of a markdown link.
     text = re.sub(r"https?://\S+", "", text)
     return " ".join(text.split()).strip()
 
@@ -273,8 +281,7 @@ def main() -> None:
     if SPEAKER_ID == 0:
         # No speaker assigned (session was never set up properly).
         return
-    data = json.load(sys.stdin)
-    text = data.get("last_assistant_message") or ""
+    text = sys.stdin.read()
     if not text:
         return
 
