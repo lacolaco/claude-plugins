@@ -23,4 +23,4 @@ else
 fi
 
 speaker_id=$(resolve_speaker "$session_id") || exit 0
-speak_text "$speaker_id" "$text"
+speak_text "$speaker_id" "$text" "$session_id"

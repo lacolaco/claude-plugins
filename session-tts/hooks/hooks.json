@@ -47,6 +47,17 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "TodoWrite",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/remind-say-on-todo.sh\""
+          }
+        ]
+      }
     ]
   }
 }

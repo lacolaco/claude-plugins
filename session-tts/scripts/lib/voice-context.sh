@@ -6,10 +6,14 @@
 #   Prints the assigned speaker id on stdout. Returns 1 if the session has
 #   no voice assigned or has been silenced via /session-tts:tts off.
 #
-# speak_text <speaker_id> <text>
-#   Forwards the given text to say-response.py with the speaker injected
-#   via env. Requires CLAUDE_PLUGIN_ROOT to be set (it always is when called
-#   from a hook or skill).
+# speak_text <speaker_id> <text> <session_id>
+#   Forwards the given text to say-response.py with the speaker and
+#   session id injected via env. session_id is required so the core
+#   scopes its single-flight pidfile per session — without it, a new
+#   utterance from session B would kill an in-progress utterance from
+#   session A, defeating the per-session voice rotation. Requires
+#   CLAUDE_PLUGIN_ROOT to be set (it always is when called from a hook
+#   or skill).
 
 resolve_speaker() {
   local session_id="$1"
@@ -31,7 +35,10 @@ resolve_speaker() {
 speak_text() {
   local speaker_id="$1"
   local text="$2"
-  printf '%s' "$text" | SESSION_TTS_SPEAKER_ID="$speaker_id" \
+  local session_id="$3"
+  printf '%s' "$text" | \
+    SESSION_TTS_SPEAKER_ID="$speaker_id" \
+    SESSION_TTS_SESSION_ID="$session_id" \
     uv run --directory "${CLAUDE_PLUGIN_ROOT}/python" \
     python "${CLAUDE_PLUGIN_ROOT}/scripts/say-response.py"
 }

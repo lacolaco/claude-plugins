@@ -18,4 +18,4 @@ text=$(printf '%s' "$input" | jq -r '.last_assistant_message // empty')
 [ -z "$text" ] && exit 0
 
 speaker_id=$(resolve_speaker "$session_id") || exit 0
-speak_text "$speaker_id" "$text"
+speak_text "$speaker_id" "$text" "$session_id"

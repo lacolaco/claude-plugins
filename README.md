@@ -9,7 +9,7 @@ Claude Code plugins by lacolaco.
 | [protect-main-branch](./protect-main-branch) | Prevent git operations that would modify the main branch (configurable) |
 | [session-handover](./session-handover) | Session handover/takeover for task continuity between sessions |
 | [retrospective](./retrospective) | Structured 6-stage retrospective for tasks, PRs, and incidents |
-| [session-tts](./session-tts) | Read Claude Code responses aloud locally with a different Japanese voice per session. Adds the `/session-tts:say` skill for short mid-turn progress narration. Permission prompts include the workspace name. ON by default; engine and voices are managed automatically (Apple Silicon) |
+| [session-tts](./session-tts) | Read Claude Code responses aloud locally with a different Japanese voice per session. Adds the `/session-tts:say` skill for short mid-turn progress narration, plus a TodoWrite hook that nudges Claude to call `/say` at task transitions. Permission prompts include the workspace name. ON by default; engine and voices are managed automatically (Apple Silicon) |
 
 ## protect-main-branch
 
@@ -102,12 +102,13 @@ Reads Claude Code's responses aloud on your local machine. Each Claude Code sess
 
 ### How it works
 
-The plugin subscribes to four hook events:
+The plugin subscribes to five hook events:
 
 - **`SessionStart`** — assigns this session a voice from the 3-slot rotation (the assignment is stored at `~/.claude/session-tts/sessions/$session_id` and stays stable across `clear`/`compact` re-fires). It also kicks off a background engine bootstrap that is idempotent: typical re-runs do nothing.
 - **`Stop`** — fires when Claude finishes a normal response; speaks `last_assistant_message`
 - **`StopFailure`** — fires when the turn ends due to an API error; speaks `last_assistant_message`
 - **`Notification`** with the `permission_prompt` matcher only — a tool needs approval → speaks 「<workspace>で承認待ちです」, where `<workspace>` is the basename of `cwd` from the hook input (e.g. 「claude-pluginsで承認待ちです」). Falls back to 「承認待ちです。」 if `cwd` is missing. (Other Notification subtypes including `idle_prompt` are intentionally not subscribed.)
+- **`PostToolUse`** with the `TodoWrite` matcher — does not speak. Returns `hookSpecificOutput.additionalContext` so Claude Code injects a reminder into the model's context, nudging it to call `/session-tts:say` with a short Japanese narration before the next text response. The hook is the deterministic forcing function; the model still owns the wording and 枕詞. No-op when the session has no voice or has been silenced.
 
 On the first session ever, the SessionStart hook downloads the local TTS engine binary into `~/.claude/session-tts/engine/` and installs the three voice models. From then on it just probes the engine's health endpoint (sub-100 ms) and exits.
 
@@ -115,7 +116,7 @@ On the first session ever, the SessionStart hook downloads the local TTS engine 
 
 The plugin is structured around a single **core**, `scripts/say-response.py`, that takes plain UTF-8 text on stdin and a per-session voice via `SESSION_TTS_SPEAKER_ID` env. It:
 
-- Terminates any in-progress playback from a previous invocation so a fresh utterance replaces (not overlaps with) the older one (single-flight via process-group `killpg`)
+- Terminates any in-progress playback from a previous invocation **of the same session** so a fresh utterance replaces (not overlaps with) the older one (single-flight is per-session via process-group `killpg`; concurrent sessions never silence each other — that would defeat the per-session voice rotation)
 - Strips Markdown (code blocks, tables, URLs, parentheses, etc.)
 - Splits text on **paragraph boundaries first**, then sentence/clause boundaries inside each paragraph. The first chunk is intentionally small (≤ 60 chars) so the first audible word arrives quickly even on long responses; later chunks are larger (≤ 250 chars) for natural cadence.
 - Synthesizes chunks via the local engine's HTTP API over a keep-alive `httpx.Client` and pushes each WAV onto a playback queue so audio starts as soon as the first chunk is ready (synthesis and playback run in parallel)
@@ -123,11 +124,12 @@ The plugin is structured around a single **core**, `scripts/say-response.py`, th
 
 Around the core are thin **adapters**, one per input source. Each adapter is responsible for whatever its own input contract dictates (hook payload schemas, notification fields, skill arguments) and ends with a plain-text call into the core via `scripts/lib/voice-context.sh`:
 
-| Adapter | Input source | Text |
+| Adapter | Input source | Text / Output |
 |---------|--------------|------|
-| `scripts/dispatch.sh` | Stop / StopFailure hook payload (stdin JSON) | `last_assistant_message` |
-| `scripts/notify-permission.sh` | Notification:permission_prompt payload | `<workspace>で承認待ちです。` |
-| `scripts/say-skill.sh` | `/session-tts:say` skill argument | the argument verbatim |
+| `scripts/dispatch.sh` | Stop / StopFailure hook payload (stdin JSON) | `last_assistant_message` (spoken) |
+| `scripts/notify-permission.sh` | Notification:permission_prompt payload | `<workspace>で承認待ちです。` (spoken) |
+| `scripts/say-skill.sh` | `/session-tts:say` skill argument | the argument verbatim (spoken) |
+| `scripts/remind-say-on-todo.sh` | PostToolUse:TodoWrite payload | JSON `additionalContext` reminder (not spoken) |
 
 The shared helper `scripts/lib/voice-context.sh` resolves the per-session speaker (or returns failure if the session has no voice or has been silenced) and forwards text to the core. Hook payload schemas never leak into the core.
 
@@ -152,7 +154,12 @@ bash "${CLAUDE_PLUGIN_ROOT}/scripts/say-skill.sh" "<japanese text>"
 
 Constraints documented in the skill: under ~100 Japanese characters per call, one phrase per invocation, reported at milestones rather than at each tool call, and always opened with a brief lead-in phrase (枕詞) like 「報告です。」「問題発生です。」「発見です。」「方針転換です。」 so the listener can orient before the body. Not used for the final turn message (Stop already handles that).
 
-The plugin nudges Claude toward calling the skill via a SessionStart instruction injected through the hook's stdout, but actual frequency is up to model judgment. If TTS has been silenced for the session via `/session-tts:tts off`, the skill is a no-op.
+The plugin nudges Claude toward calling the skill via two mechanisms:
+
+1. A `SessionStart` instruction injected through the hook's stdout (declares the four calling moments and the lead-in phrase rule).
+2. A `PostToolUse:TodoWrite` hook that returns `hookSpecificOutput.additionalContext` reminding Claude to call `/say` before the next text response. This is the deterministic forcing function for the "task transition" case — todo state changed → narrate it. The hook does not speak directly; it only injects a reminder, and the model owns wording and 枕詞 (todo content is typically English / non-sentence text and AivisSpeech is a Japanese engine, so direct narration would be wrong).
+
+Actual frequency is still up to model judgment. If TTS has been silenced for the session via `/session-tts:tts off`, both the skill and the TodoWrite reminder are no-ops.
 
 ### Toggle voice playback: `/session-tts:tts`
 
