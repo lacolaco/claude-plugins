@@ -311,13 +311,13 @@ Stale pidfile entries are harmless because both `os.killpg` errors
 ## 9. Hook subscriptions
 
 `hooks/hooks.json` subscribes five events. Audio-producing hooks are
-`async: true` so they never block the turn flow; the context-injection
-hook is synchronous so its output reaches the model before the next
-response.
+`async: true` so they never block the turn flow; context-injecting
+hooks are synchronous so their stdout reaches the model before the
+next response.
 
 | Event                                      | Adapter                       | async | Notes                                                                        |
 | ------------------------------------------ | ----------------------------- | ----- | ---------------------------------------------------------------------------- |
-| `SessionStart`                             | `session-on.sh`               | yes   | voice rotation, engine bootstrap, instruction injection via stdout            |
+| `SessionStart`                             | `session-on.sh`               | no    | voice rotation, instruction injection via stdout, self-backgrounded engine bootstrap |
 | `Stop`                                     | `dispatch.sh`                 | yes   | normal turn end; speaks `last_assistant_message`                              |
 | `StopFailure`                              | `dispatch.sh`                 | yes   | turn ended due to API error; speaks `last_assistant_message`                  |
 | `Notification` matcher `permission_prompt` | `notify-permission.sh`        | yes   | tool needs approval; speaks workspace-aware Japanese phrase                   |
@@ -327,10 +327,13 @@ Other `Notification` subtypes (`idle_prompt` etc.) are intentionally
 **not** subscribed — narrating idle prompts is annoying and adds no
 value over the existing visual prompt.
 
-The `TodoWrite` hook is **the only synchronous hook** in the plugin.
-That is intentional: its output is consumed by the model's next
-generation step, so it must complete first. Latency is negligible
-(one `jq -n` invocation).
+`SessionStart` and `PostToolUse:TodoWrite` are synchronous because
+both rely on stdout-as-context — Claude Code only captures that output
+when the hook runs synchronously. Async hooks are fire-and-forget and
+their stdout is discarded. To keep `SessionStart` non-blocking despite
+being synchronous, `session-on.sh` self-backgrounds the slow engine
+bootstrap with `{ … } & disown`; the synchronous part (voice rotation
++ instruction heredoc) is essentially instantaneous.
 
 ## 10. How `/session-tts:say` gets invoked
 
