@@ -230,6 +230,16 @@ so playback flows naturally; instead each item gets a trailing `。` if
 it lacks one. That gives the synthesizer a clause-level pause between
 items without the longer paragraph-level gap.
 
+Heading folding: a markdown heading paragraph (single line matching
+`#{1,6}\s+\S`) is *not* emitted on its own. Its cleaned text is held
+over and prepended to the next non-heading paragraph with a `。`
+separator, so a `## 検証` followed by its section body produces one
+paragraph, not two. Without this, the heading would render as its own
+≤ a few-character chunk bracketed by `prePhonemeLength` lead-in +
+`afplay` device-open overhead, audibly isolating a single word. If a
+heading is the last paragraph (no content follows), it is emitted
+on its own as a fallback. Regular paragraph breaks are preserved.
+
 Hard cap: `MAX_TEXT_LENGTH = 2000` chars after cleanup. Anything past
 that is truncated.
 
