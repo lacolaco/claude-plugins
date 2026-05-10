@@ -87,6 +87,9 @@ _LIST_ITEM_RE = re.compile(r"^([-*+]\s+|\d+\.\s+)(.*)")
 _TERMINAL_PUNCT = ("。", "．", "！", "？", "!", "?", ".", "、", "，", ",")
 
 
+_HEADING_LINE_RE = re.compile(r"^#{1,6}\s+\S")
+
+
 def clean(text: str) -> str:
     """Strip Markdown and emit paragraphs separated by `\n\n`.
 
@@ -94,12 +97,27 @@ def clean(text: str) -> str:
     flows naturally; instead each item gets a trailing `。` if it lacks
     one, which gives the synthesizer a clause-level pause between items
     without the longer paragraph-level gap.
+
+    Markdown headings (a paragraph whose only line starts with `#…#
+    `) are NOT emitted as their own paragraph. Instead the heading
+    text is held over and prepended to the *next* non-heading
+    paragraph (with `。` between them), so a heading like `## 検証`
+    does not become a 2-character chunk bookended by audible silence
+    (`prePhonemeLength` pad + `afplay` device-open overhead per
+    chunk). Regular paragraph boundaries are preserved — only the
+    heading-vs-its-section split is collapsed.
     """
     paragraphs = re.split(r"\n[ \t]*\n+", text)
     out: list[str] = []
     in_code = False
+    pending_heading = ""
     for paragraph in paragraphs:
         lines = paragraph.split("\n")
+        is_heading_only = (
+            not in_code
+            and len(lines) == 1
+            and _HEADING_LINE_RE.match(lines[0].strip()) is not None
+        )
         cleaned: list[str] = []
         for line in lines:
             s = line.strip()
@@ -129,8 +147,19 @@ def clean(text: str) -> str:
         if not cleaned:
             continue
         merged = _strip_inline_markdown(" ".join(cleaned))
-        if merged:
-            out.append(merged)
+        if not merged:
+            continue
+        if is_heading_only:
+            if not merged.endswith(_TERMINAL_PUNCT):
+                merged += "。"
+            pending_heading += merged
+            continue
+        if pending_heading:
+            merged = pending_heading + merged
+            pending_heading = ""
+        out.append(merged)
+    if pending_heading:
+        out.append(pending_heading)
     return "\n\n".join(out)[:MAX_TEXT_LENGTH]
 
 

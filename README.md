@@ -118,7 +118,7 @@ The plugin is structured around a single **core**, `scripts/say-response.py`, th
 
 - Terminates any in-progress playback from a previous invocation **of the same session** so a fresh utterance replaces (not overlaps with) the older one (single-flight is per-session via process-group `killpg`; concurrent sessions never silence each other — that would defeat the per-session voice rotation)
 - Strips Markdown (code blocks, tables, URLs, parentheses, etc.)
-- Splits text on **paragraph boundaries first**, then sentence/clause boundaries inside each paragraph. The first chunk is intentionally small (≤ 60 chars) so the first audible word arrives quickly even on long responses; later chunks are larger (≤ 250 chars) for natural cadence.
+- Splits text on **paragraph boundaries first**, then sentence/clause boundaries inside each paragraph. The first chunk is intentionally small (≤ 60 chars) so the first audible word arrives quickly even on long responses; later chunks are larger (≤ 250 chars) for natural cadence. Markdown headings (`## title`) are *not* emitted as their own paragraph — the heading text is folded into the next paragraph with a `。` separator, so a single-word heading does not become a 2-character chunk bracketed by audible silence (`prePhonemeLength` pad + `afplay` device-open overhead per chunk).
 - Synthesizes chunks via the local engine's HTTP API over a keep-alive `httpx.Client` and pushes each WAV onto a playback queue so audio starts as soon as the first chunk is ready (synthesis and playback run in parallel)
 - A player thread drains the queue, plays each WAV with macOS `afplay` in order, and deletes the temp files
 

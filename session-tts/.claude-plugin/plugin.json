@@ -1,7 +1,7 @@
 {
   "name": "session-tts",
   "description": "Read Claude Code responses aloud locally with a different Japanese voice per session. Adds the /session-tts:say skill so Claude can narrate short mid-turn progress phrases on demand, and a TodoWrite hook that nudges Claude to call /say at task transitions. Permission prompts include the workspace name in the narration. ON by default; engine and models are managed automatically. Apple Silicon only.",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "author": {
     "name": "Suguru Inatomi"
   },
