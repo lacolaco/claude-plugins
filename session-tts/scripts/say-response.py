@@ -17,7 +17,6 @@ from __future__ import annotations
 import os
 import queue
 import re
-import signal
 import subprocess
 import sys
 import tempfile
@@ -28,16 +27,6 @@ import httpx
 ENGINE_BASE_URL = os.environ.get("SESSION_TTS_ENGINE_URL", "http://127.0.0.1:10101")
 SPEAKER_ID = int(os.environ.get("SESSION_TTS_SPEAKER_ID", "0"))
 SESSION_ID = os.environ.get("SESSION_TTS_SESSION_ID", "")
-# Playback scope. "main" is the default (Stop / Notification hook).
-# Mid-turn say.sh sets "say" to get its own pidfile lane and a queue-based
-# (wait-then-register) instead of preempt-then-register semantics:
-#   - "main" preempts the previous "main" utterance (so a new response
-#     replaces the older one) — but does not touch "say".
-#   - "say" waits for the previous "say" utterance to finish, then plays.
-#     So consecutive mid-turn reports are serialized (no overlap) and the
-#     Stop hook that fires right after a mid-turn report no longer kills
-#     it (different pidfile lane).
-SCOPE = os.environ.get("SESSION_TTS_SCOPE", "main")
 
 MAX_TEXT_LENGTH = 2000
 # Engine docs recommend keeping each /synthesis call under 500 chars and
@@ -68,12 +57,13 @@ TRUNCATION_NOTICE = "以下、省略します。"
 # follow the system "alert volume"; this is the simplest substitute.
 PLAYBACK_VOLUME = "0.8"
 
-# Per-session, per-scope pidfile. Different scopes for the same session
-# never see each other's pidfile, so the Stop hook ("main") and mid-turn
-# say.sh ("say") cannot kill each other. Different sessions still have
-# independent pidfiles within each scope (concurrent sessions keep their
-# audio — that's the whole point of the per-session voice rotation).
-PIDFILE_DIR = os.path.expanduser(f"~/.claude/session-tts/playback/{SCOPE}")
+# Per-session pidfile. Every utterance from this session — Stop hook,
+# Notification hook, or mid-turn say.sh — queues on the same file. A
+# new instance polls the pidfile until the recorded process group is
+# gone, then registers itself. Nothing kills anything. Concurrent
+# sessions still have independent pidfiles (the per-session voice
+# rotation is what makes parallel sessions distinguishable by ear).
+PIDFILE_DIR = os.path.expanduser("~/.claude/session-tts/playback")
 PIDFILE = os.path.join(PIDFILE_DIR, SESSION_ID) if SESSION_ID else ""
 
 
@@ -234,27 +224,13 @@ def split_into_chunks(text: str) -> list[str]:
 # --- single-flight playback ------------------------------------------------
 
 
-def kill_previous_playback() -> None:
-    if not PIDFILE:
-        return
-    try:
-        with open(PIDFILE) as f:
-            old_pgid = int(f.read().strip())
-    except (FileNotFoundError, ValueError):
-        return
-    try:
-        os.killpg(old_pgid, signal.SIGTERM)
-    except (ProcessLookupError, PermissionError):
-        pass
-
-
 def wait_for_previous_playback(poll_interval: float = 0.2) -> None:
-    """Block until the previous playback in this scope finishes.
+    """Block until the playback recorded in `PIDFILE` finishes.
 
-    Used by the "say" scope so consecutive mid-turn reports queue up
-    rather than overlap. Polls the pidfile + signal-0 instead of using
-    fcntl.flock to keep behavior identical to the killpg path (which
-    also walks the pidfile contents).
+    All utterances for this session — Stop hook, Notification hook,
+    mid-turn say — share the same pidfile and queue uniformly. The
+    next utterance polls the pidfile with `signal 0` until the
+    recorded process group is gone, then registers itself.
     """
     import time
 
@@ -267,8 +243,6 @@ def wait_for_previous_playback(poll_interval: float = 0.2) -> None:
         except (FileNotFoundError, ValueError):
             return
         try:
-            # Signal 0 = "check existence without sending". If the process
-            # group leader is gone, we own the slot.
             os.killpg(old_pgid, 0)
         except (ProcessLookupError, PermissionError):
             return
@@ -380,13 +354,10 @@ def main() -> None:
     if len(chunks) > MAX_CHUNKS:
         chunks = chunks[:MAX_CHUNKS] + [TRUNCATION_NOTICE]
 
-    if SCOPE == "say":
-        # mid-turn say.sh: queue up behind the previous mid-turn report
-        # so consecutive narrations play in order without overlap.
-        wait_for_previous_playback()
-    else:
-        # main / default: preempt the previous in-flight utterance.
-        kill_previous_playback()
+    # Every utterance queues behind the previous one for this session.
+    # Nothing is killed; Stop hooks, Notification hooks, and mid-turn
+    # say.sh all wait their turn on the same pidfile.
+    wait_for_previous_playback()
     register_self()
     try:
         with httpx.Client(base_url=ENGINE_BASE_URL, timeout=60.0) as client:
