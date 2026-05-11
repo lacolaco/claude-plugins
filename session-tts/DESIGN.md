@@ -46,6 +46,7 @@ session-tts/
 │   └── setup_engine.py            # engine binary + voice model bootstrap
 └── skills/
     ├── tts/SKILL.md               # /session-tts:tts on/off/toggle/status
+    ├── tts/tts.sh                 # /session-tts:tts skill adapter (silence + kill current playback)
     ├── say/SKILL.md               # /session-tts:say <japanese>
     └── say/say.sh                 # /session-tts:say skill adapter (co-located with SKILL.md)
 ```
@@ -392,10 +393,18 @@ without a state change is useless.
 
 ### 11.1 `/session-tts:tts <on|off|toggle|status>`
 
-Pure shell: toggles the presence of
+Pure shell adapter at `skills/tts/tts.sh`. Toggles the presence of
 `~/.claude/session-tts/silenced/$CLAUDE_CODE_SESSION_ID`. The skill is
 declared `disable-model-invocation: true` so the model never calls it
 on its own — it is purely user-driven.
+
+When silencing the session (`off`, or `toggle` flipping to off), the
+adapter also reads `playback/<session_id>` and sends `SIGTERM` to that
+process group, then removes the pidfile. Without this step, calling
+`tts off` mid-utterance would leave the current chunk queue draining
+even though new utterances are blocked — surprising and frustrating.
+Targeting only the session's own pidfile means a concurrent session's
+audio is never affected.
 
 ### 11.2 `/session-tts:say <japanese>`
 
