@@ -19,20 +19,24 @@ fi
 
 data_dir="$HOME/.claude/session-tts"
 silenced_dir="$data_dir/silenced"
-pidfile_dir="$data_dir/playback"
+playback_dir="$data_dir/playback"
 silenced_file="$silenced_dir/$session_id"
-pidfile="$pidfile_dir/$session_id"
 
 kill_current_playback() {
-  [ -f "$pidfile" ] || return 0
-  local pgid
-  pgid=$(cat "$pidfile" 2>/dev/null || echo "")
-  if [ -n "$pgid" ]; then
-    # The pidfile holds the process-group leader's pid. Sending SIGTERM to
-    # the group brings down the python adapter and its child afplay together.
-    kill -TERM -- "-$pgid" 2>/dev/null || true
-  fi
-  rm -f "$pidfile"
+  # `off` should silence everything for this session — so walk every scope
+  # subdirectory (main / say / ...) under playback/ and kill whichever
+  # utterance is still in flight in any of them.
+  for pidfile in "$playback_dir"/*/"$session_id"; do
+    [ -f "$pidfile" ] || continue
+    local pgid
+    pgid=$(cat "$pidfile" 2>/dev/null || echo "")
+    if [ -n "$pgid" ]; then
+      # The pidfile holds the process-group leader's pid. SIGTERM to the
+      # group brings down the python adapter and its afplay child together.
+      kill -TERM -- "-$pgid" 2>/dev/null || true
+    fi
+    rm -f "$pidfile"
+  done
 }
 
 silence_on() {

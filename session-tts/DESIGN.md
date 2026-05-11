@@ -151,11 +151,13 @@ Invariants:
   read by every subsequent hook and skill adapter.
 - A session is silenced **iff** `silenced/<sid>` exists. The two files
   are independent, so toggling silence does not change voice.
-- `playback/<session_id>` reflects the most-recently-launched
-  `say-response.py` process group **for that session**. Different
-  sessions have separate pidfiles, so they cannot kill each other.
-  Stale entries are harmless because `kill_previous_playback`
-  ignores `ProcessLookupError`.
+- `playback/<scope>/<session_id>` reflects the most-recently-launched
+  `say-response.py` process group **for that session AND scope**.
+  Different sessions have separate pidfiles, and within a session the
+  Stop hook (scope=main) and the mid-turn say.sh (scope=say) also
+  have separate pidfiles, so they cannot kill each other. Stale
+  entries are harmless because `kill_previous_playback` ignores
+  `ProcessLookupError`.
 
 ## 5. Voice assignment
 
@@ -282,24 +284,42 @@ Multi-paragraph answers get sped up so they don't drag.
 
 ## 8. Single-flight playback (per session)
 
-A new utterance must replace, not overlap with, an **in-progress
-utterance from the same session**. Different sessions never preempt
-each other — that would defeat the per-session voice rotation by
-making only the most-recent session audible.
+A new utterance must coordinate with any **in-progress utterance from
+the same session**, but the coordination rule differs by *scope*:
 
-Implementation uses POSIX process groups and a per-session pidfile:
+- **`main` scope** (Stop / Notification hook): a fresh response must
+  *replace* a still-playing older response — the user just got a new
+  reply and the previous one is stale. So `main` **preempts**.
+- **`say` scope** (mid-turn say.sh): consecutive mid-turn reports
+  should all be heard, in order. They are short progress updates,
+  not stale-replacing-stale. So `say` **queues**.
+- **Across scopes**: never kill each other. Without this, the Stop
+  hook firing at the end of every turn would `killpg` the still-
+  playing mid-turn report that the model just dispatched.
 
-1. The core reads `SESSION_TTS_SESSION_ID` from env and constructs
-   `PIDFILE = ~/.claude/session-tts/playback/<session_id>`.
-2. `kill_previous_playback()` reads `PIDFILE` (if any) and sends
-   `SIGTERM` to the **whole process group** with `os.killpg`. That
-   kills the previous Python process *and* its `afplay` child in
-   one go; without `killpg`, the child `afplay` would survive a
-   single-PID kill on the parent. Because `PIDFILE` is per session,
-   only same-session processes can be the target.
-3. `register_self()` calls `os.setpgrp()` (becoming a new
+Different sessions also never preempt each other — that would defeat
+the per-session voice rotation by making only the most-recent session
+audible.
+
+Implementation uses POSIX process groups and a per-session, per-scope
+pidfile:
+
+1. The core reads `SESSION_TTS_SESSION_ID` and `SESSION_TTS_SCOPE`
+   from env and constructs
+   `PIDFILE = ~/.claude/session-tts/playback/<scope>/<session_id>`.
+2. For `main` scope, `kill_previous_playback()` reads `PIDFILE` (if any)
+   and sends `SIGTERM` to the **whole process group** with
+   `os.killpg`. That kills the previous Python process *and* its
+   `afplay` child in one go; without `killpg`, the child `afplay`
+   would survive a single-PID kill on the parent.
+3. For `say` scope, `wait_for_previous_playback()` polls `PIDFILE`
+   with `signal 0` until the recorded process group is gone, then
+   returns. Polling beats `fcntl.flock` here because we already need
+   to read the pid for `os.killpg` semantics; staying in the same
+   shape keeps the code paths symmetric.
+4. `register_self()` calls `os.setpgrp()` (becoming a new
    process-group leader) and writes its PID to `PIDFILE`.
-4. On clean exit, `clear_self()` removes its own pidfile entry.
+5. On clean exit, `clear_self()` removes its own pidfile entry.
 
 If `SESSION_TTS_SESSION_ID` is missing (defensive — should not happen
 in practice because every adapter passes it), single-flight degrades
@@ -425,12 +445,13 @@ declared `disable-model-invocation: true` so the model never calls it
 on its own — it is purely user-driven.
 
 When silencing the session (`off`, or `toggle` flipping to off), the
-adapter also reads `playback/<session_id>` and sends `SIGTERM` to that
-process group, then removes the pidfile. Without this step, calling
-`tts off` mid-utterance would leave the current chunk queue draining
-even though new utterances are blocked — surprising and frustrating.
-Targeting only the session's own pidfile means a concurrent session's
-audio is never affected.
+adapter walks every scope subdirectory under `playback/` and sends
+`SIGTERM` to whichever process group is still running for this
+session (main and/or say), then removes the pidfile. Without this
+step, calling `tts off` mid-utterance would leave the current chunk
+queue draining even though new utterances are blocked — surprising
+and frustrating. Walking every scope means a later scope addition
+keeps working without changes to this skill.
 
 ### 11.2 (retired) `/session-tts:say`
 
@@ -467,7 +488,7 @@ the hook adapters.
   preemption is allowed (a fresh reply in session A replaces an
   in-progress reply in session A).
 - **Crash safety.** A killed Python process leaves a stale entry in
-  its `playback/<session_id>` pidfile and possibly a stale temp WAV.
+  its `playback/<scope>/<session_id>` pidfile and possibly a stale temp WAV.
   Both are self-correcting on the next utterance from that session
   (`killpg` no-ops, temp files are unlinked after `afplay` per
   chunk). Other sessions are unaffected.
