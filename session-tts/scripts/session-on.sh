@@ -30,25 +30,42 @@ mkdir -p "$sessions_dir"
 # SessionStart hook stdout is captured by Claude Code as additional context
 # (https://code.claude.com/docs/en/hooks: "Any text your hook script prints
 # to stdout is added as context for Claude"). This is the only point at
-# which the plugin can teach the model when to invoke /session-tts:say —
-# without it the skill exists but is never called autonomously.
+# which the plugin can teach the model when to dispatch the
+# session-tts-speaker agent — without it the agent exists but is never
+# called autonomously.
 cat <<'EOF'
 [session-tts] TTS is enabled for this session.
 
-The /session-tts:say skill is available to speak Japanese phrases aloud as
-**verbal task-progress reports during autonomous, multi-step work**. The
-goal is to let the user follow your progress by ear without reading every
-message.
+You can deliver **verbal task-progress reports during autonomous, multi-step
+work** by dispatching the `session-tts-speaker` sub-agent. The goal is to let
+the user follow your progress by ear without reading every message.
 
-Call /session-tts:say at these moments:
+**Always invoke via the Agent tool with `run_in_background=true`:**
+
+```
+Agent({
+  subagent_type: "session-tts-speaker",
+  prompt: "<lead-in + body, one short Japanese phrase>",
+  run_in_background: true,
+  description: "TTS report"
+})
+```
+
+The agent runs the playback in its own context (no Bash output in your
+main transcript) and `run_in_background=true` returns immediately, so
+audio synthesis never blocks the work you were doing. Do **not** invoke
+the underlying `skills/say/say.sh` directly with Bash — that would block
+this turn and dump output into your context.
+
+Call the agent at these moments:
 - **Task transitions**: when you finish a task and move on to the next
 - **Problems**: when a task hits an unexpected obstacle, error, or blocker
 - **Important findings**: when investigation surfaces a notable result
 - **Direction changes**: when you revise the plan or pivot the approach
 
-Length: keep each call under ~100 Japanese characters.
+Length: keep each prompt under ~100 Japanese characters.
 
-**Format**: every utterance must begin with a brief lead-in phrase (枕詞)
+**Format**: every prompt must begin with a brief lead-in phrase (枕詞)
 before the main content, so the listener has a beat to register that an
 update is coming instead of being dropped into the body cold. Match the
 lead-in to the moment:
@@ -70,7 +87,8 @@ Avoid:
 - The final response of a turn (Stop hook narrates the final assistant
   message automatically)
 
-The skill is a no-op if TTS has been silenced via /session-tts:tts off.
+The skill (and therefore the agent) is a no-op if TTS has been silenced
+via /session-tts:tts off.
 EOF
 
 # --- pick a voice for this session (only if not already assigned) -----

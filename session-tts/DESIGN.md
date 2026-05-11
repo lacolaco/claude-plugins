@@ -44,11 +44,12 @@ session-tts/
 ├── python/
 │   ├── pyproject.toml             # uv-managed runtime (httpx, py7zr)
 │   └── setup_engine.py            # engine binary + voice model bootstrap
-└── skills/
-    ├── tts/SKILL.md               # /session-tts:tts on/off/toggle/status
-    ├── tts/tts.sh                 # /session-tts:tts skill adapter (silence + kill current playback)
-    ├── say/SKILL.md               # /session-tts:say <japanese>
-    └── say/say.sh                 # /session-tts:say skill adapter (co-located with SKILL.md)
+├── skills/
+│   ├── tts/SKILL.md               # /session-tts:tts on/off/toggle/status
+│   ├── tts/tts.sh                 # /session-tts:tts skill adapter (silence + kill current playback)
+│   └── say/say.sh                 # adapter for the say path; not a slash command. Called by the session-tts-speaker agent.
+└── agents/
+    └── tts-speaker.md             # session-tts-speaker sub-agent (calls say.sh via Bash, dispatched with run_in_background=true)
 ```
 
 The plugin is structured as a single **core** (`say-response.py`)
@@ -86,7 +87,7 @@ in the background.
 | ------------------------------------ | ----------------------------------------------- | -------------------------------------------- |
 | `scripts/dispatch.sh`                | Stop / StopFailure hook stdin (JSON)            | speaks `last_assistant_message`              |
 | `scripts/notify-permission.sh`       | `Notification:permission_prompt` hook stdin     | speaks `${basename(cwd)}で承認待ちです。`    |
-| `skills/say/say.sh`                  | `/session-tts:say` skill argv                   | speaks argv[1] verbatim                      |
+| `skills/say/say.sh`                  | `session-tts-speaker` agent's Bash call argv    | speaks argv[1] verbatim                      |
 | `scripts/session-on.sh` (special)    | `SessionStart` hook stdin                       | speaks "TTSを開始します。" (1st run only) + injects guidance via stdout |
 | `scripts/remind-say-on-todo.sh`      | `PostToolUse:TodoWrite` hook stdin              | injects `hookSpecificOutput.additionalContext` reminder (does not speak) |
 
@@ -336,10 +337,24 @@ being synchronous, `session-on.sh` self-backgrounds the slow engine
 bootstrap with `{ … } & disown`; the synchronous part (voice rotation
 + instruction heredoc) is essentially instantaneous.
 
-## 10. How `/session-tts:say` gets invoked
+## 10. How mid-turn narration gets invoked
 
-The skill is model-invocable, but the model needs to be reminded to
-call it. Two layers of reinforcement:
+The model needs to be reminded to narrate progress. Two layers of
+reinforcement, both pointing the model at the `session-tts-speaker` agent
+rather than at a synchronous Bash call. Going through the agent buys two
+properties a direct call can't deliver:
+
+1. **Non-blocking** — the agent is dispatched with
+   `run_in_background=true`, so the main turn keeps moving while audio
+   synthesis happens elsewhere. Calling the skill directly waits for
+   the whole bash → python → afplay chain.
+2. **Context isolation** — SKILL.md text and bash output land in the
+   agent's transcript, not the main session's. Mid-turn reports don't
+   bloat the conversation.
+
+The agent's `tools` is `Bash`-only — it forwards its prompt verbatim to
+`skills/say/say.sh` via Bash, so the underlying execution path is identical
+to what the retired slash-command skill used to do.
 
 ### 10.1 SessionStart instruction injection (broad guidance)
 
@@ -347,21 +362,23 @@ call it. Two layers of reinforcement:
 `https://code.claude.com/docs/en/hooks`, stdout from `SessionStart`,
 `UserPromptSubmit`, and `UserPromptExpansion` "is added as context
 that Claude can see and act on" — `SessionStart` is the natural place
-to teach the model when to invoke the skill.
+to teach the model when to dispatch the agent.
 
 The injected text:
 
 - declares that TTS is enabled,
-- lists the four moments to call the skill (transition / problem /
-  finding / pivot),
+- spells out the `Agent({subagent_type: "session-tts-speaker", prompt: …,
+  run_in_background: true})` calling convention and warns against
+  calling the skill directly,
+- lists the four moments to invoke (transition / problem / finding /
+  pivot),
 - requires every utterance to begin with a brief lead-in phrase (枕詞)
   so the listener has a beat to register that an update is coming, and
 - explicitly forbids per-tool narration and use for the final turn
   message (Stop already covers that).
 
-The same constraints are duplicated in `skills/say/SKILL.md` so they
-appear in both the auto-injected guidance and the skill's own
-description.
+The same constraints are duplicated in `agents/say.md` so they appear in
+both the auto-injected guidance and the agent's own description.
 
 ### 10.2 PostToolUse:TodoWrite reminder (deterministic forcing function)
 
@@ -371,7 +388,7 @@ forcing function** that fires *exactly* at one of the four moments
 ("task transition") and re-surfaces the rule into the model's context
 right when it matters. This is the mechanism that closes the gap
 between "the model understands the rule in the abstract" and "the
-model actually invokes the skill at runtime."
+model actually dispatches the agent at runtime."
 
 Why `TodoWrite` specifically:
 
@@ -406,15 +423,48 @@ even though new utterances are blocked — surprising and frustrating.
 Targeting only the session's own pidfile means a concurrent session's
 audio is never affected.
 
-### 11.2 `/session-tts:say <japanese>`
+### 11.2 (retired) `/session-tts:say`
 
-Model-invocable. Wraps `skills/say/say.sh "$1"`, which goes through the
-same `resolve_speaker` → `speak_text` path as the hooks. The adapter
-lives next to its SKILL.md, and resolves the plugin root from
-`BASH_SOURCE` because `CLAUDE_PLUGIN_ROOT` is unset under Bash-tool
-invocation (it is only set for hook invocations). If the session is
-silenced, `resolve_speaker` returns failure and the skill exits without
-speaking.
+Removed in v0.7.0. The previous slash-command skill made the say path
+model-invocable, but every call (a) blocked the main turn until
+synthesis and playback finished and (b) dumped the SKILL.md body and
+Bash output into the main context. Both costs were unacceptable for a
+mid-turn "report" use case. The new entry point is the
+`session-tts-speaker` sub-agent (§12.1), dispatched with
+`run_in_background=true`. The underlying script `skills/say/say.sh`
+remains as the implementation; only the slash-command surface was
+deleted.
+
+## 12. Agents
+
+### 12.1 `session-tts-speaker`
+
+A `tools: Bash`, `model: haiku` sub-agent whose only job is to run
+`bash "$plugin_root/skills/say/say.sh" "<prompt>"` and exit. Defined at
+`agents/tts-speaker.md`.
+
+Two properties motivate the indirection:
+
+- **Non-blocking dispatch.** Invoked with `run_in_background=true`, the
+  agent runs concurrently with the spawning conversation. Synthesis +
+  playback never blocks the next tool call.
+- **Context isolation.** The agent has its own transcript. Bash output
+  and the script's chatter land there instead of in the main session.
+  Mid-turn reports stop bloating the conversation.
+
+Plugin root inside the agent's Bash environment is resolved by:
+
+1. `${CLAUDE_PLUGIN_ROOT}` if set (true for hook subprocesses; not
+   guaranteed for agent-spawned shells)
+2. otherwise the most-recent cached install: `ls -dt
+   ~/.claude/plugins/cache/lacolaco-plugins/session-tts/*/ | head -1`
+
+The agent does not implement any TTS logic — it is a thin context
+boundary in front of the existing script path. Removing the agent
+would not change *what* gets spoken, only *who pays the context cost*
+and *whether the caller waits*. The agent is no-op when the session is
+silenced (because `say.sh` → `voice-context.sh::resolve_speaker`
+returns failure).
 
 ## 12. Concurrency model and invariants
 
