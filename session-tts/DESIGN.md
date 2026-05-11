@@ -65,7 +65,7 @@ adapter (hook stdin / skill arg)
   → resolve_speaker (lib/voice-context.sh)
   → speak_text (lib/voice-context.sh)
   → say-response.py (stdin = text, env = speaker)
-      ├── kill_previous_playback (single-flight)
+      ├── wait_for_previous_playback (queue)
       ├── clean()              # strip markdown
       ├── split_into_chunks()  # paragraph → sentence/clause
       ├── synth_worker  ──┐
@@ -155,13 +155,12 @@ Invariants:
   read by every subsequent hook and skill adapter.
 - A session is silenced **iff** `silenced/<sid>` exists. The two files
   are independent, so toggling silence does not change voice.
-- `playback/<scope>/<session_id>` reflects the most-recently-launched
-  `say-response.py` process group **for that session AND scope**.
-  Different sessions have separate pidfiles, and within a session the
-  Stop hook (scope=main) and the mid-turn say.sh (scope=say) also
-  have separate pidfiles, so they cannot kill each other. Stale
-  entries are harmless because `kill_previous_playback` ignores
-  `ProcessLookupError`.
+- `playback/<session_id>` reflects the most-recently-launched
+  `say-response.py` process group **for that session**. Different
+  sessions have separate pidfiles. All utterance types within a
+  session share this one pidfile and queue uniformly. Stale entries
+  are harmless because `wait_for_previous_playback` treats
+  `ProcessLookupError` from `os.killpg(pgid, 0)` as "slot is free".
 
 ## 5. Voice assignment
 
@@ -289,59 +288,55 @@ Multi-paragraph answers get sped up so they don't drag.
 ## 8. Single-flight playback (per session)
 
 A new utterance must coordinate with any **in-progress utterance from
-the same session**, but the coordination rule differs by *scope*:
+the same session**. The rule is uniform: **everything queues, nothing
+is killed**. Every entry point — Stop / StopFailure hook,
+Notification:permission_prompt hook, and mid-turn say.sh — shares one
+per-session pidfile, and a new utterance polls that pidfile until the
+recorded process group is gone, then registers itself.
 
-- **`main` scope** (Stop / Notification hook): a fresh response must
-  *replace* a still-playing older `main` response — the user just got
-  a new reply and the previous one is stale. So `main` **preempts the
-  previous main**. Before doing so, it **waits for any in-flight
-  `say`-scope playback** to finish, so the Stop-hook narration does
-  not start on top of a still-playing mid-turn report.
-- **`say` scope** (mid-turn say.sh): consecutive mid-turn reports
-  should all be heard, in order. They are short progress updates,
-  not stale-replacing-stale. So `say` **queues**.
-- **Across scopes**: `main` *waits* for `say` to drain (no killing);
-  `say` is unaffected by `main`. The asymmetry reflects the fact that
-  Stop-hook narration can be deferred a few seconds without harm, but
-  a mid-turn report being killed is what produced the "silently
-  missing" bug (see §11.2 retired notes).
+Earlier designs split coordination by scope (Stop hook preempts, mid-
+turn queues, Stop waits for mid-turn) but the resulting matrix of
+asymmetric rules was hard to reason about and the user-perceived
+behavior — "two voices speaking at the same time" or "the mid-turn
+report disappeared" — kept regressing. Uniform queue beats clever
+preempt.
+
+Trade-off: an old utterance is never cut short, even if it has been
+superseded by a fresher one. In practice this almost never matters
+because each turn produces a single Stop-hook reading, and mid-turn
+say is short (≤100 Japanese chars, a few seconds).
 
 Different sessions also never preempt each other — that would defeat
 the per-session voice rotation by making only the most-recent session
 audible.
 
-Implementation uses POSIX process groups and a per-session, per-scope
-pidfile:
+Implementation uses POSIX process groups and a per-session pidfile:
 
-1. The core reads `SESSION_TTS_SESSION_ID` and `SESSION_TTS_SCOPE`
-   from env and constructs
-   `PIDFILE = ~/.claude/session-tts/playback/<scope>/<session_id>`.
-2. For `main` scope, `kill_previous_playback()` reads `PIDFILE` (if any)
-   and sends `SIGTERM` to the **whole process group** with
-   `os.killpg`. That kills the previous Python process *and* its
-   `afplay` child in one go; without `killpg`, the child `afplay`
-   would survive a single-PID kill on the parent.
-3. For `say` scope, `wait_for_pidfile_drain(PIDFILE)` polls the
-   `say`-scope pidfile with `signal 0` until the recorded process group
-   is gone, then returns.
-4. For `main` scope, before the killpg above, the core first calls
-   `wait_for_pidfile_drain(_scope_pidfile("say"))` to wait out any
-   in-flight mid-turn report from the same session. This prevents the
-   Stop hook from starting playback on top of a still-playing mid-turn
-   say. Polling beats `fcntl.flock` here because we already need to
-   read the pid for `os.killpg` semantics; staying in the same shape
-   keeps the code paths symmetric.
-5. `register_self()` calls `os.setpgrp()` (becoming a new
-   process-group leader) and writes its PID to `PIDFILE`.
-6. On clean exit, `clear_self()` removes its own pidfile entry.
+1. The core reads `SESSION_TTS_SESSION_ID` from env and constructs
+   `PIDFILE = ~/.claude/session-tts/playback/<session_id>`.
+2. `wait_for_previous_playback()` polls `PIDFILE` with `signal 0`
+   (`os.killpg(pgid, 0)` — existence check, no signal delivered).
+   When the recorded process group is gone, it returns. While the
+   previous group is still alive, it sleeps in 0.2 s ticks.
+3. `register_self()` calls `os.setpgrp()` (becoming a new
+   process-group leader) and writes its PID to `PIDFILE`. The PID
+   doubles as the new process-group leader id, so the next utterance
+   can `killpg(pgid, 0)` against it.
+4. On clean exit, `clear_self()` removes its own pidfile entry.
+
+`os.killpg` is still the right tool for the existence check (over
+`os.kill` against the bare pid) because each utterance becomes a
+process-group leader via `setpgrp()`; checking the group includes
+the child `afplay`.
 
 If `SESSION_TTS_SESSION_ID` is missing (defensive — should not happen
-in practice because every adapter passes it), single-flight degrades
-to "no preemption at all" rather than "global preemption". Better to
-leak a stale playback than to silence other sessions.
+in practice because every adapter passes it), the queue degrades to
+"no coordination at all" rather than blocking forever. Better to risk
+a brief overlap than to deadlock on a missing key.
 
 Stale pidfile entries are harmless because both `os.killpg` errors
-(`ProcessLookupError`, `PermissionError`) are swallowed.
+(`ProcessLookupError`, `PermissionError`) are swallowed and read as
+"slot is free".
 
 ## 9. Hook subscriptions
 
@@ -479,13 +474,12 @@ declared `disable-model-invocation: true` so the model never calls it
 on its own — it is purely user-driven.
 
 When silencing the session (`off`, or `toggle` flipping to off), the
-adapter walks every scope subdirectory under `playback/` and sends
-`SIGTERM` to whichever process group is still running for this
-session (main and/or say), then removes the pidfile. Without this
-step, calling `tts off` mid-utterance would leave the current chunk
-queue draining even though new utterances are blocked — surprising
-and frustrating. Walking every scope means a later scope addition
-keeps working without changes to this skill.
+adapter reads the session's pidfile and sends `SIGTERM` to that
+process group, then removes the pidfile. Without this step, calling
+`tts off` mid-utterance would leave the current chunk queue draining
+even though new utterances are blocked — surprising and frustrating.
+Targeting only the session's own pidfile means a concurrent session's
+audio is never affected.
 
 ### 11.2 (retired) `/session-tts:say`
 
@@ -522,7 +516,7 @@ the hook adapters.
   preemption is allowed (a fresh reply in session A replaces an
   in-progress reply in session A).
 - **Crash safety.** A killed Python process leaves a stale entry in
-  its `playback/<scope>/<session_id>` pidfile and possibly a stale temp WAV.
+  its `playback/<session_id>` pidfile and possibly a stale temp WAV.
   Both are self-correcting on the next utterance from that session
   (`killpg` no-ops, temp files are unlinked after `afplay` per
   chunk). Other sessions are unaffected.
