@@ -30,34 +30,34 @@ mkdir -p "$sessions_dir"
 # SessionStart hook stdout is captured by Claude Code as additional context
 # (https://code.claude.com/docs/en/hooks: "Any text your hook script prints
 # to stdout is added as context for Claude"). This is the only point at
-# which the plugin can teach the model when to dispatch the
-# session-tts-speaker agent — without it the agent exists but is never
-# called autonomously.
-cat <<'EOF'
+# which the plugin can teach the model how to narrate mid-turn progress.
+plugin_root_for_instr="${CLAUDE_PLUGIN_ROOT}"
+cat <<EOF
 [session-tts] TTS is enabled for this session.
 
 You can deliver **verbal task-progress reports during autonomous, multi-step
-work** by dispatching the `session-tts-speaker` sub-agent. The goal is to let
-the user follow your progress by ear without reading every message.
+work** so the user can follow your progress by ear without reading every
+message.
 
-**Always invoke via the Agent tool with `run_in_background=true`:**
+**Always invoke via the Bash tool with \`run_in_background: true\`**:
 
-```
-Agent({
-  subagent_type: "session-tts-speaker",
-  prompt: "<lead-in + body, one short Japanese phrase>",
-  run_in_background: true,
-  description: "TTS report"
-})
-```
+\`\`\`
+Bash(
+  command: bash "${plugin_root_for_instr}/skills/say/say.sh" "<lead-in + body, one short Japanese phrase>",
+  description: "TTS report",
+  run_in_background: true
+)
+\`\`\`
 
-The agent runs the playback in its own context (no Bash output in your
-main transcript) and `run_in_background=true` returns immediately, so
-audio synthesis never blocks the work you were doing. Do **not** invoke
-the underlying `skills/say/say.sh` directly with Bash — that would block
-this turn and dump output into your context.
+\`run_in_background: true\` returns immediately with just a "Command running
+in background" line — synthesis and playback proceed in a detached process
+so the next tool call is never blocked, and the audio chatter stays out of
+your main transcript. Do **not** call this without \`run_in_background\` —
+without it, the turn waits for synthesis + afplay to finish.
 
-Call the agent at these moments:
+Call this at these moments:
+EOF
+cat <<'EOF'
 - **Task transitions**: when you finish a task and move on to the next
 - **Problems**: when a task hits an unexpected obstacle, error, or blocker
 - **Important findings**: when investigation surfaces a notable result
@@ -65,10 +65,10 @@ Call the agent at these moments:
 
 Length: keep each prompt under ~100 Japanese characters.
 
-**Format**: every prompt must begin with a brief lead-in phrase (枕詞)
-before the main content, so the listener has a beat to register that an
-update is coming instead of being dropped into the body cold. Match the
-lead-in to the moment:
+**Format**: every phrase must begin with a brief lead-in (枕詞) before
+the body, so the listener has a beat to register that an update is
+coming instead of being dropped into content cold. Match the lead-in
+to the moment:
 
 - transitions: 「報告です。」「完了です。」「進捗です。」
 - problems: 「問題発生です。」「エラーです。」
@@ -87,8 +87,8 @@ Avoid:
 - The final response of a turn (Stop hook narrates the final assistant
   message automatically)
 
-The skill (and therefore the agent) is a no-op if TTS has been silenced
-via /session-tts:tts off.
+say.sh itself is a no-op if TTS has been silenced via /session-tts:tts off,
+so it's safe to call it without checking silence status.
 EOF
 
 # --- pick a voice for this session (only if not already assigned) -----

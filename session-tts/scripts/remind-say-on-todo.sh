@@ -2,9 +2,9 @@
 # PostToolUse:TodoWrite hook adapter.
 #
 # Does NOT speak. Returns hookSpecificOutput.additionalContext so Claude
-# Code injects a reminder into the model's context, nudging it to dispatch
-# the session-tts-speaker agent (which in turn calls the say skill) with a
-# properly composed Japanese narration before its next text response.
+# Code injects a reminder into the model's context, nudging it to call
+# the say.sh script via Bash with run_in_background=true so playback is
+# non-blocking and doesn't dump tool output into the main transcript.
 #
 # Why a reminder rather than auto-narration: todo content is typically
 # English (or terse non-sentence text), and AivisSpeech is a Japanese
@@ -28,9 +28,10 @@ data_dir="$HOME/.claude/session-tts"
 
 # PostToolUse stdout is NOT auto-injected as context (unlike SessionStart).
 # We must return JSON with hookSpecificOutput.additionalContext.
-jq -n '{
+plugin_root="${CLAUDE_PLUGIN_ROOT}"
+jq -n --arg cmd "bash \"$plugin_root/skills/say/say.sh\" \"<phrase>\"" '{
   hookSpecificOutput: {
     hookEventName: "PostToolUse",
-    additionalContext: "[session-tts] Todo state changed. Before your next text response, dispatch the `session-tts-speaker` agent via `Agent({subagent_type: \"session-tts-speaker\", prompt: \"<phrase>\", run_in_background: true})` to narrate this transition. Open with a lead-in phrase (報告です / 着手します / 完了です など) and keep it under ~100 Japanese characters. Example prompt: 「報告です。<前のタスク>が完了しました。次は<次のタスク>に入ります」. Always use run_in_background=true so it does not block your next work. Skip if you just dispatched the agent in the immediately preceding step."
+    additionalContext: ("[session-tts] Todo state changed. Before your next text response, narrate this transition by calling the Bash tool with run_in_background=true and command: `" + $cmd + "`. Open with a lead-in phrase (報告です / 着手します / 完了です など) and keep the phrase under ~100 Japanese characters. Example: 「報告です。<前のタスク>が完了しました。次は<次のタスク>に入ります」. run_in_background=true is REQUIRED — without it, the turn blocks for synthesis + playback. Skip if you just narrated in the immediately preceding step.")
   }
 }'

@@ -1,6 +1,6 @@
 {
   "name": "session-tts",
-  "description": "Read Claude Code responses aloud locally with a different Japanese voice per session. Ships the `session-tts-speaker` sub-agent for non-blocking, context-isolated mid-turn progress narration, plus a TodoWrite hook that nudges Claude to dispatch it at task transitions. Permission prompts include the workspace name in the narration. ON by default; engine and models are managed automatically. Apple Silicon only.",
+  "description": "Read Claude Code responses aloud locally with a different Japanese voice per session. Instructs Claude to deliver mid-turn progress narration via Bash with run_in_background=true (non-blocking, minimal context impact), plus a TodoWrite hook that nudges narration at task transitions. Permission prompts include the workspace name. ON by default; engine and models are managed automatically. Apple Silicon only.",
   "version": "0.7.0",
   "author": {
     "name": "Suguru Inatomi"
