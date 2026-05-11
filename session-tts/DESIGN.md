@@ -33,12 +33,12 @@ and the invariants that hold across hooks and skills.
 ```
 session-tts/
 ├── .claude-plugin/plugin.json     # plugin metadata
-├── hooks/hooks.json               # hook subscriptions (SessionStart / Stop / StopFailure / Notification)
+├── hooks/hooks.json               # hook subscriptions (SessionStart / Stop / StopFailure / Notification / PreToolUse / PostToolUse / UserPromptSubmit)
 ├── scripts/
 │   ├── session-on.sh              # SessionStart adapter (voice rotation + engine bootstrap)
 │   ├── dispatch.sh                # Stop / StopFailure adapter
 │   ├── notify-permission.sh       # Notification:permission_prompt adapter
-│   ├── remind-say-on-todo.sh      # PostToolUse:TodoWrite adapter (context-injection only)
+│   ├── remind-say.sh              # Reminder adapter for PostToolUse:TodoWrite, PreToolUse:Monitor, PreToolUse:Agent, UserPromptSubmit (trigger passed as argv[1])
 │   ├── say-response.py            # CORE: text → audio
 │   └── lib/voice-context.sh       # shared resolve_speaker / speak_text helpers
 ├── python/
@@ -88,7 +88,10 @@ in the background.
 | `scripts/notify-permission.sh`       | `Notification:permission_prompt` hook stdin     | speaks `${basename(cwd)}で承認待ちです。`    |
 | `skills/say/say.sh`                  | Bash tool argv (model-driven, `run_in_background=true`) | speaks argv[1] verbatim              |
 | `scripts/session-on.sh` (special)    | `SessionStart` hook stdin                       | speaks "TTSを開始します。" (1st run only) + injects guidance via stdout |
-| `scripts/remind-say-on-todo.sh`      | `PostToolUse:TodoWrite` hook stdin              | injects `hookSpecificOutput.additionalContext` reminder (does not speak) |
+| `scripts/remind-say.sh todo`         | `PostToolUse:TodoWrite` hook stdin              | injects `hookSpecificOutput.additionalContext` reminder (does not speak) |
+| `scripts/remind-say.sh monitor`      | `PreToolUse:Monitor` hook stdin                 | injects reminder before a long watch starts (does not speak)              |
+| `scripts/remind-say.sh agent`        | `PreToolUse:Agent` hook stdin                   | injects reminder before sub-agent dispatch (does not speak)               |
+| `scripts/remind-say.sh prompt`       | `UserPromptSubmit` hook stdin                   | writes stdout reminder (auto-appended to context); does not speak         |
 
 Adapters are thin. They:
 
@@ -103,15 +106,16 @@ If the text or voice is missing, the adapter exits silently. This keeps
 hook noise out of Claude Code's UI on edge cases (no session id, never
 went through `SessionStart`, silenced, etc.).
 
-### 3.3 Why the TodoWrite hook does not speak
+### 3.3 Why the reminder hooks do not speak
 
-`remind-say-on-todo.sh` is the only adapter that *injects context*
-rather than producing audio. The reason: todo content is typically
-English (e.g. "Implement X", "Fix Y") or terse non-sentence text,
-and AivisSpeech is a Japanese engine — feeding the engine raw todo
+`remind-say.sh` (and the four hook events that dispatch it) is the
+only family of adapters that *injects context* rather than producing
+audio. The reason: hook payloads (todo content, tool args, user
+prompts) are typically English or terse non-sentence text, and
+AivisSpeech is a Japanese engine — feeding the engine raw payload
 strings would either fail or sound nonsensical. Editorial framing
 (枕詞, summary, lead-in phrase) belongs to the model, which can
-compose a proper Japanese sentence. The hook's only job is to be a
+compose a proper Japanese sentence. The hooks' only job is to be a
 **deterministic forcing function** that the model cannot forget at
 todo-state-change moments.
 
@@ -331,28 +335,38 @@ Stale pidfile entries are harmless because both `os.killpg` errors
 
 ## 9. Hook subscriptions
 
-`hooks/hooks.json` subscribes five events. Audio-producing hooks are
+`hooks/hooks.json` subscribes eight events. Audio-producing hooks are
 `async: true` so they never block the turn flow; context-injecting
-hooks are synchronous so their stdout reaches the model before the
-next response.
+hooks are synchronous so their stdout (or `hookSpecificOutput`) reaches
+the model before the next response.
 
-| Event                                      | Adapter                       | async | Notes                                                                        |
-| ------------------------------------------ | ----------------------------- | ----- | ---------------------------------------------------------------------------- |
-| `SessionStart`                             | `session-on.sh`               | no    | voice rotation, instruction injection via stdout, self-backgrounded engine bootstrap |
-| `Stop`                                     | `dispatch.sh`                 | yes   | normal turn end; speaks `last_assistant_message`                              |
-| `StopFailure`                              | `dispatch.sh`                 | yes   | turn ended due to API error; speaks `last_assistant_message`                  |
-| `Notification` matcher `permission_prompt` | `notify-permission.sh`        | yes   | tool needs approval; speaks workspace-aware Japanese phrase                   |
-| `PostToolUse` matcher `TodoWrite`          | `remind-say-on-todo.sh`       | no    | does not speak; injects `additionalContext` reminding the model to call `/say` |
+| Event                                      | Adapter                       | async | Notes                                                                                  |
+| ------------------------------------------ | ----------------------------- | ----- | -------------------------------------------------------------------------------------- |
+| `SessionStart`                             | `session-on.sh`               | no    | voice rotation, instruction injection via stdout, self-backgrounded engine bootstrap   |
+| `Stop`                                     | `dispatch.sh`                 | yes   | normal turn end; speaks `last_assistant_message`                                       |
+| `StopFailure`                              | `dispatch.sh`                 | yes   | turn ended due to API error; speaks `last_assistant_message`                           |
+| `Notification` matcher `permission_prompt` | `notify-permission.sh`        | yes   | tool needs approval; speaks workspace-aware Japanese phrase                            |
+| `PostToolUse` matcher `TodoWrite`          | `remind-say.sh todo`          | no    | does not speak; reminds the model to narrate the task transition                       |
+| `PreToolUse` matcher `Monitor`             | `remind-say.sh monitor`       | no    | does not speak; reminds the model to narrate what is being monitored and why           |
+| `PreToolUse` matcher `Agent`               | `remind-say.sh agent`         | no    | does not speak; reminds the model to narrate the delegated subtask + follow-up         |
+| `UserPromptSubmit` (no matcher)            | `remind-say.sh prompt`        | no    | does not speak; reminds the model that this turn may be multi-step and to narrate it   |
 
 Other `Notification` subtypes (`idle_prompt` etc.) are intentionally
 **not** subscribed — narrating idle prompts is annoying and adds no
-value over the existing visual prompt.
+value over the existing visual prompt. Likewise the reminder hooks
+target only matchers that mark a real milestone (Monitor = long
+watch, Agent = sub-agent dispatch, TodoWrite = task transition,
+UserPromptSubmit = new turn boundary). High-frequency tools like
+Write / Edit / Bash are deliberately **not** matched, because firing
+a reminder on every one of them would bloat the context and dilute
+the signal.
 
-`SessionStart` and `PostToolUse:TodoWrite` are synchronous because
-both rely on stdout-as-context — Claude Code only captures that output
-when the hook runs synchronously. Async hooks are fire-and-forget and
-their stdout is discarded. To keep `SessionStart` non-blocking despite
-being synchronous, `session-on.sh` self-backgrounds the slow engine
+`SessionStart` and all `remind-say.sh ...` hooks are synchronous
+because they rely on stdout-as-context or `hookSpecificOutput` —
+Claude Code only captures that output when the hook runs synchronously.
+Async hooks are fire-and-forget and their stdout is discarded. To
+keep `SessionStart` non-blocking despite being synchronous,
+`session-on.sh` self-backgrounds the slow engine
 bootstrap with `{ … } & disown`; the synchronous part (voice rotation
 + instruction heredoc) is essentially instantaneous.
 
@@ -409,31 +423,41 @@ The injected text:
 - explicitly forbids per-tool narration and use for the final turn
   message (Stop already covers that).
 
-### 10.2 PostToolUse:TodoWrite reminder (deterministic forcing function)
+### 10.2 Reminder hooks (deterministic forcing functions)
 
 The `SessionStart` injection is broad guidance and decays in attention
-as the conversation grows. The `TodoWrite` hook is the **point-in-time
-forcing function** that fires *exactly* at one of the four moments
-("task transition") and re-surfaces the rule into the model's context
-right when it matters. This is the mechanism that closes the gap
-between "the model understands the rule in the abstract" and "the
-model actually narrates at runtime."
+as the conversation grows. Four hook events re-surface the narration
+rule at **point-in-time moments** that map to one of the four
+milestones (transition / problem / finding / pivot). All of them
+dispatch through `scripts/remind-say.sh` with a trigger argument,
+which produces the appropriate `hookSpecificOutput.additionalContext`
+(or stdout, for UserPromptSubmit) — that is, no audio is produced;
+just a short reminder Claude reads before the next response.
 
-Why `TodoWrite` specifically:
+| Trigger          | Hook event / matcher                | Milestone it forces                                                   |
+| ---------------- | ----------------------------------- | --------------------------------------------------------------------- |
+| `todo`           | `PostToolUse` / `TodoWrite`         | task transition (todo state changed)                                  |
+| `monitor`        | `PreToolUse` / `Monitor`            | long watch starting; model should describe what is being monitored    |
+| `agent`          | `PreToolUse` / `Agent`              | sub-agent dispatch; model should describe the delegated subtask       |
+| `prompt`         | `UserPromptSubmit` (no matcher)     | new turn boundary; model should narrate progress if this is multi-step |
 
-- `TodoWrite` is the canonical signal of a transition. The tool's
-  semantics — marking items `in_progress`/`completed` — *are* the
-  transition. No heuristic needed.
-- It fires at most once per state change, so reminders do not
-  spam the context.
-- It is the only tool whose firing maps 1:1 to a milestone-level
-  event. `Write` / `Edit` / `Bash` fire too often to be reasonable
-  triggers.
+Why these matchers specifically:
 
-The hook does not detect *which* todos changed (PostToolUse only sees
-post-state, not the diff). It assumes "if `TodoWrite` was called,
-something transitioned" — true by construction, since `TodoWrite`
-without a state change is useless.
+- `TodoWrite` is the canonical signal of a task transition — its very
+  semantics (marking items `in_progress`/`completed`) *are* the transition.
+- `Monitor` and `Agent` mark entry into long-running or delegated work
+  — both are natural moments for "what's happening next" narration.
+- `UserPromptSubmit` is the only event that fires at the start of every
+  turn, before any tool call. It catches multi-step turns that don't
+  go through TodoWrite.
+- High-frequency tools (`Write` / `Edit` / `Bash`) are deliberately
+  not matched — firing on every one of those would bloat the context
+  and dilute the signal. A subset selection is the whole point.
+
+Each reminder ends with the same boilerplate (`Skip if you just
+narrated in the immediately preceding step.`) so the model
+self-throttles when several triggers fire close together (e.g. user
+prompt → todo update on the same turn).
 
 ## 11. Skills
 
