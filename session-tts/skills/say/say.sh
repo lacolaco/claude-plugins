@@ -25,4 +25,10 @@ session_id="${CLAUDE_CODE_SESSION_ID:-}"
 [ -z "$text" ] && exit 0
 
 speaker_id=$(resolve_speaker "$session_id") || exit 0
+
+# Run in the "say" playback scope: a separate pidfile lane (so the Stop
+# hook that fires at the end of the same turn cannot kill this report)
+# with queue semantics inside the scope (so consecutive mid-turn reports
+# play in order instead of overlapping or killing each other).
+export SESSION_TTS_SCOPE=say
 speak_text "$speaker_id" "$text" "$session_id"
