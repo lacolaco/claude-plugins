@@ -172,7 +172,7 @@ Voice is ON by default in every new session. Use the `/session-tts:tts` skill to
 /session-tts:tts status  # show current state (default)
 ```
 
-The skill toggles `~/.claude/session-tts/silenced/$CLAUDE_CODE_SESSION_ID` and is independent of the voice assignment, so silencing then re-enabling preserves the same voice. Other concurrent sessions are unaffected. The same flag is honored by the `/session-tts:say` skill above.
+The skill toggles `~/.claude/session-tts/silenced/$CLAUDE_CODE_SESSION_ID` and is independent of the voice assignment, so silencing then re-enabling preserves the same voice. Switching to `off` additionally kills any utterance still playing for this session (via the per-session playback pidfile), so the silence takes effect immediately rather than draining the remaining chunk queue. Other concurrent sessions are unaffected. The same flag is honored by the `/session-tts:say` skill above.
 
 ### Installation
 
