@@ -108,7 +108,12 @@ The plugin subscribes to five hook events:
 - **`Stop`** — fires when Claude finishes a normal response; speaks `last_assistant_message`
 - **`StopFailure`** — fires when the turn ends due to an API error; speaks `last_assistant_message`
 - **`Notification`** with the `permission_prompt` matcher only — a tool needs approval → speaks 「<workspace>で承認待ちです」, where `<workspace>` is the basename of `cwd` from the hook input (e.g. 「claude-pluginsで承認待ちです」). Falls back to 「承認待ちです。」 if `cwd` is missing. (Other Notification subtypes including `idle_prompt` are intentionally not subscribed.)
-- **`PostToolUse`** with the `TodoWrite` matcher — does not speak. Returns `hookSpecificOutput.additionalContext` so Claude Code injects a reminder into the model's context, nudging it to call `say.sh` via Bash with `run_in_background=true` (a short Japanese narration of the transition) before the next text response. The hook is the deterministic forcing function; the model still owns the wording and 枕詞. No-op when the session has no voice or has been silenced.
+- **Reminder hooks** (do not speak, only inject context):
+  - **`PostToolUse:TodoWrite`** — task transition: nudge to narrate completion → next task
+  - **`PreToolUse:Monitor`** — about to watch a long-running background task: nudge to narrate what/why
+  - **`PreToolUse:Agent`** — about to dispatch a sub-agent: nudge to narrate the delegated work + plan
+  - **`UserPromptSubmit`** — new turn boundary: nudge to narrate at milestones if this becomes multi-step
+  All four dispatch through `scripts/remind-say.sh <trigger>` and return `hookSpecificOutput.additionalContext` (or, for UserPromptSubmit, stdout) reminding Claude to call `say.sh` via Bash with `run_in_background=true`. The model still owns wording and 枕詞. No-op when the session has no voice or has been silenced. High-frequency tools (Write/Edit/Bash) are deliberately not matched to avoid context spam.
 
 On the first session ever, the SessionStart hook downloads the local TTS engine binary into `~/.claude/session-tts/engine/` and installs the three voice models. From then on it just probes the engine's health endpoint (sub-100 ms) and exits.
 
@@ -129,7 +134,7 @@ Around the core are thin **adapters**, one per input source. Each adapter is res
 | `scripts/dispatch.sh` | Stop / StopFailure hook payload (stdin JSON) | `last_assistant_message` (spoken) |
 | `scripts/notify-permission.sh` | Notification:permission_prompt payload | `<workspace>で承認待ちです。` (spoken) |
 | `skills/say/say.sh` | Bash tool argv (called by Claude with `run_in_background=true` for mid-turn narration) | the argument verbatim (spoken) |
-| `scripts/remind-say-on-todo.sh` | PostToolUse:TodoWrite payload | JSON `additionalContext` reminder (not spoken) |
+| `scripts/remind-say.sh <trigger>` | hook stdin (one of: TodoWrite, Monitor, Agent, UserPromptSubmit) | JSON `additionalContext` reminder (todo/monitor/agent) or plain stdout (prompt). Not spoken. |
 
 The shared helper `scripts/lib/voice-context.sh` resolves the per-session speaker (or returns failure if the session has no voice or has been silenced) and forwards text to the core. Hook payload schemas never leak into the core.
 
@@ -168,7 +173,7 @@ Constraints: under ~100 Japanese characters per call, one phrase per invocation,
 The plugin nudges Claude toward making this call via two mechanisms:
 
 1. A `SessionStart` instruction injected through the hook's stdout (declares the calling moments, lead-in rule, and the exact Bash + `run_in_background` shape).
-2. A `PostToolUse:TodoWrite` hook that returns `hookSpecificOutput.additionalContext` reminding Claude to narrate before the next text response. This is the deterministic forcing function for the "task transition" case — todo state changed → narrate it. The hook does not speak directly; it only injects the reminder, and the model owns wording and 枕詞 (todo content is typically English / non-sentence text and the engine is Japanese, so direct narration would be wrong).
+2. Four reminder hooks, all dispatched through `scripts/remind-say.sh <trigger>`, that re-surface the narration rule at point-in-time milestones — `PostToolUse:TodoWrite` (task transition), `PreToolUse:Monitor` (long watch starting), `PreToolUse:Agent` (sub-agent dispatch), `UserPromptSubmit` (new turn boundary). Each injects a short reminder via `hookSpecificOutput.additionalContext` (or stdout for UserPromptSubmit) and does not produce audio — the model owns wording and 枕詞 because hook payloads are typically English/terse and the engine is Japanese. Each reminder ends with `Skip if you just narrated in the immediately preceding step.` so the model self-throttles when several triggers fire close together.
 
 Actual frequency is still up to model judgment. `say.sh` itself is a no-op if TTS has been silenced via `/session-tts:tts off`, so accidental calls during silenced sessions don't produce audio.
 
