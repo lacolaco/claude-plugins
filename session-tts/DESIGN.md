@@ -292,14 +292,19 @@ A new utterance must coordinate with any **in-progress utterance from
 the same session**, but the coordination rule differs by *scope*:
 
 - **`main` scope** (Stop / Notification hook): a fresh response must
-  *replace* a still-playing older response — the user just got a new
-  reply and the previous one is stale. So `main` **preempts**.
+  *replace* a still-playing older `main` response — the user just got
+  a new reply and the previous one is stale. So `main` **preempts the
+  previous main**. Before doing so, it **waits for any in-flight
+  `say`-scope playback** to finish, so the Stop-hook narration does
+  not start on top of a still-playing mid-turn report.
 - **`say` scope** (mid-turn say.sh): consecutive mid-turn reports
   should all be heard, in order. They are short progress updates,
   not stale-replacing-stale. So `say` **queues**.
-- **Across scopes**: never kill each other. Without this, the Stop
-  hook firing at the end of every turn would `killpg` the still-
-  playing mid-turn report that the model just dispatched.
+- **Across scopes**: `main` *waits* for `say` to drain (no killing);
+  `say` is unaffected by `main`. The asymmetry reflects the fact that
+  Stop-hook narration can be deferred a few seconds without harm, but
+  a mid-turn report being killed is what produced the "silently
+  missing" bug (see §11.2 retired notes).
 
 Different sessions also never preempt each other — that would defeat
 the per-session voice rotation by making only the most-recent session
@@ -316,14 +321,19 @@ pidfile:
    `os.killpg`. That kills the previous Python process *and* its
    `afplay` child in one go; without `killpg`, the child `afplay`
    would survive a single-PID kill on the parent.
-3. For `say` scope, `wait_for_previous_playback()` polls `PIDFILE`
-   with `signal 0` until the recorded process group is gone, then
-   returns. Polling beats `fcntl.flock` here because we already need
-   to read the pid for `os.killpg` semantics; staying in the same
-   shape keeps the code paths symmetric.
-4. `register_self()` calls `os.setpgrp()` (becoming a new
+3. For `say` scope, `wait_for_pidfile_drain(PIDFILE)` polls the
+   `say`-scope pidfile with `signal 0` until the recorded process group
+   is gone, then returns.
+4. For `main` scope, before the killpg above, the core first calls
+   `wait_for_pidfile_drain(_scope_pidfile("say"))` to wait out any
+   in-flight mid-turn report from the same session. This prevents the
+   Stop hook from starting playback on top of a still-playing mid-turn
+   say. Polling beats `fcntl.flock` here because we already need to
+   read the pid for `os.killpg` semantics; staying in the same shape
+   keeps the code paths symmetric.
+5. `register_self()` calls `os.setpgrp()` (becoming a new
    process-group leader) and writes its PID to `PIDFILE`.
-5. On clean exit, `clear_self()` removes its own pidfile entry.
+6. On clean exit, `clear_self()` removes its own pidfile entry.
 
 If `SESSION_TTS_SESSION_ID` is missing (defensive — should not happen
 in practice because every adapter passes it), single-flight degrades

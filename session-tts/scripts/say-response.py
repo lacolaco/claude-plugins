@@ -248,21 +248,34 @@ def kill_previous_playback() -> None:
         pass
 
 
-def wait_for_previous_playback(poll_interval: float = 0.2) -> None:
-    """Block until the previous playback in this scope finishes.
+def _scope_pidfile(scope: str) -> str:
+    if not SESSION_ID:
+        return ""
+    return os.path.join(
+        os.path.expanduser(f"~/.claude/session-tts/playback/{scope}"),
+        SESSION_ID,
+    )
 
-    Used by the "say" scope so consecutive mid-turn reports queue up
-    rather than overlap. Polls the pidfile + signal-0 instead of using
-    fcntl.flock to keep behavior identical to the killpg path (which
-    also walks the pidfile contents).
+
+def wait_for_pidfile_drain(target_pidfile: str, poll_interval: float = 0.2) -> None:
+    """Block until the playback recorded in `target_pidfile` finishes.
+
+    Used by:
+      - the "say" scope (target = own pidfile) so consecutive mid-turn
+        reports queue up rather than overlap.
+      - the "main" scope (target = the "say" scope pidfile) so the Stop
+        hook narration does not start while a mid-turn report is still
+        playing. Stop hook reading the assistant's reply on top of a
+        still-playing mid-turn say is jarring; better to delay the Stop
+        narration by the few seconds it takes the mid-turn to finish.
     """
     import time
 
-    if not PIDFILE:
+    if not target_pidfile:
         return
     while True:
         try:
-            with open(PIDFILE) as f:
+            with open(target_pidfile) as f:
                 old_pgid = int(f.read().strip())
         except (FileNotFoundError, ValueError):
             return
@@ -383,9 +396,12 @@ def main() -> None:
     if SCOPE == "say":
         # mid-turn say.sh: queue up behind the previous mid-turn report
         # so consecutive narrations play in order without overlap.
-        wait_for_previous_playback()
+        wait_for_pidfile_drain(PIDFILE)
     else:
-        # main / default: preempt the previous in-flight utterance.
+        # main / default: first wait out any in-flight mid-turn report
+        # (scope=say) so the Stop-hook narration doesn't overlap it; then
+        # preempt the previous main-scope utterance as usual.
+        wait_for_pidfile_drain(_scope_pidfile("say"))
         kill_previous_playback()
     register_self()
     try:
