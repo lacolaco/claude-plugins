@@ -11,9 +11,13 @@
 #   session id injected via env. session_id is required so the core
 #   scopes its single-flight pidfile per session — without it, a new
 #   utterance from session B would kill an in-progress utterance from
-#   session A, defeating the per-session voice rotation. Requires
-#   CLAUDE_PLUGIN_ROOT to be set (it always is when called from a hook
-#   or skill).
+#   session A, defeating the per-session voice rotation.
+#
+# Plugin root resolution:
+#   Claude Code sets CLAUDE_PLUGIN_ROOT for hook invocations but NOT for the
+#   Bash tool used by skill adapters. We fall back to resolving the plugin
+#   root from this file's own location (lib/ → ../..) so callers from either
+#   entry point work without having to pre-export the variable.
 
 resolve_speaker() {
   local session_id="$1"
@@ -32,13 +36,23 @@ resolve_speaker() {
   printf '%s' "$speaker_id"
 }
 
+_voice_context_plugin_root() {
+  if [ -n "${CLAUDE_PLUGIN_ROOT:-}" ]; then
+    printf '%s' "$CLAUDE_PLUGIN_ROOT"
+    return
+  fi
+  (cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
+}
+
 speak_text() {
   local speaker_id="$1"
   local text="$2"
   local session_id="$3"
+  local plugin_root
+  plugin_root=$(_voice_context_plugin_root)
   printf '%s' "$text" | \
     SESSION_TTS_SPEAKER_ID="$speaker_id" \
     SESSION_TTS_SESSION_ID="$session_id" \
-    uv run --directory "${CLAUDE_PLUGIN_ROOT}/python" \
-    python "${CLAUDE_PLUGIN_ROOT}/scripts/say-response.py"
+    uv run --directory "$plugin_root/python" \
+    python "$plugin_root/scripts/say-response.py"
 }
