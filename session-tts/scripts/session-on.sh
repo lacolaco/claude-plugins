@@ -30,28 +30,45 @@ mkdir -p "$sessions_dir"
 # SessionStart hook stdout is captured by Claude Code as additional context
 # (https://code.claude.com/docs/en/hooks: "Any text your hook script prints
 # to stdout is added as context for Claude"). This is the only point at
-# which the plugin can teach the model when to invoke /session-tts:say —
-# without it the skill exists but is never called autonomously.
-cat <<'EOF'
+# which the plugin can teach the model how to narrate mid-turn progress.
+plugin_root_for_instr="${CLAUDE_PLUGIN_ROOT}"
+cat <<EOF
 [session-tts] TTS is enabled for this session.
 
-The /session-tts:say skill is available to speak Japanese phrases aloud as
-**verbal task-progress reports during autonomous, multi-step work**. The
-goal is to let the user follow your progress by ear without reading every
+You can deliver **verbal task-progress reports during autonomous, multi-step
+work** so the user can follow your progress by ear without reading every
 message.
 
-Call /session-tts:say at these moments:
+**Always invoke via the Bash tool with \`run_in_background: true\`**:
+
+\`\`\`
+Bash(
+  command: bash "${plugin_root_for_instr}/skills/say/say.sh" "<lead-in + body, one short Japanese phrase>",
+  description: "TTS report",
+  run_in_background: true
+)
+\`\`\`
+
+\`run_in_background: true\` returns immediately with just a "Command running
+in background" line — synthesis and playback proceed in a detached process
+so the next tool call is never blocked, and the audio chatter stays out of
+your main transcript. Do **not** call this without \`run_in_background\` —
+without it, the turn waits for synthesis + afplay to finish.
+
+Call this at these moments:
+EOF
+cat <<'EOF'
 - **Task transitions**: when you finish a task and move on to the next
 - **Problems**: when a task hits an unexpected obstacle, error, or blocker
 - **Important findings**: when investigation surfaces a notable result
 - **Direction changes**: when you revise the plan or pivot the approach
 
-Length: keep each call under ~100 Japanese characters.
+Length: keep each prompt under ~100 Japanese characters.
 
-**Format**: every utterance must begin with a brief lead-in phrase (枕詞)
-before the main content, so the listener has a beat to register that an
-update is coming instead of being dropped into the body cold. Match the
-lead-in to the moment:
+**Format**: every phrase must begin with a brief lead-in (枕詞) before
+the body, so the listener has a beat to register that an update is
+coming instead of being dropped into content cold. Match the lead-in
+to the moment:
 
 - transitions: 「報告です。」「完了です。」「進捗です。」
 - problems: 「問題発生です。」「エラーです。」
@@ -70,7 +87,8 @@ Avoid:
 - The final response of a turn (Stop hook narrates the final assistant
   message automatically)
 
-The skill is a no-op if TTS has been silenced via /session-tts:tts off.
+say.sh itself is a no-op if TTS has been silenced via /session-tts:tts off,
+so it's safe to call it without checking silence status.
 EOF
 
 # --- pick a voice for this session (only if not already assigned) -----
