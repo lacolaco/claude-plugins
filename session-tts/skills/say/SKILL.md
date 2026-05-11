@@ -7,7 +7,7 @@ description: Speak a Japanese phrase aloud in the current session's voice as a v
 Run the following Bash command with a Japanese phrase as the argument.
 
 ```
-bash "${CLAUDE_PLUGIN_ROOT}/scripts/say-skill.sh" "<text>"
+bash "${CLAUDE_PLUGIN_ROOT}/skills/say/say.sh" "<text>"
 ```
 
 Constraints:

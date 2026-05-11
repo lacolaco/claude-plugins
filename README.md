@@ -128,7 +128,7 @@ Around the core are thin **adapters**, one per input source. Each adapter is res
 |---------|--------------|------|
 | `scripts/dispatch.sh` | Stop / StopFailure hook payload (stdin JSON) | `last_assistant_message` (spoken) |
 | `scripts/notify-permission.sh` | Notification:permission_prompt payload | `<workspace>で承認待ちです。` (spoken) |
-| `scripts/say-skill.sh` | `/session-tts:say` skill argument | the argument verbatim (spoken) |
+| `skills/say/say.sh` | `/session-tts:say` skill argument | the argument verbatim (spoken) |
 | `scripts/remind-say-on-todo.sh` | PostToolUse:TodoWrite payload | JSON `additionalContext` reminder (not spoken) |
 
 The shared helper `scripts/lib/voice-context.sh` resolves the per-session speaker (or returns failure if the session has no voice or has been silenced) and forwards text to the core. Hook payload schemas never leak into the core.
@@ -149,7 +149,7 @@ Suggested calling moments (delivered to Claude via SessionStart instruction inje
 The skill runs:
 
 ```
-bash "${CLAUDE_PLUGIN_ROOT}/scripts/say-skill.sh" "<japanese text>"
+bash "${CLAUDE_PLUGIN_ROOT}/skills/say/say.sh" "<japanese text>"
 ```
 
 Constraints documented in the skill: under ~100 Japanese characters per call, one phrase per invocation, reported at milestones rather than at each tool call, and always opened with a brief lead-in phrase (枕詞) like 「報告です。」「問題発生です。」「発見です。」「方針転換です。」 so the listener can orient before the body. Not used for the final turn message (Stop already handles that).

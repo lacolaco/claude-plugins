@@ -39,7 +39,6 @@ session-tts/
 │   ├── dispatch.sh                # Stop / StopFailure adapter
 │   ├── notify-permission.sh       # Notification:permission_prompt adapter
 │   ├── remind-say-on-todo.sh      # PostToolUse:TodoWrite adapter (context-injection only)
-│   ├── say-skill.sh               # /session-tts:say skill adapter
 │   ├── say-response.py            # CORE: text → audio
 │   └── lib/voice-context.sh       # shared resolve_speaker / speak_text helpers
 ├── python/
@@ -47,7 +46,8 @@ session-tts/
 │   └── setup_engine.py            # engine binary + voice model bootstrap
 └── skills/
     ├── tts/SKILL.md               # /session-tts:tts on/off/toggle/status
-    └── say/SKILL.md               # /session-tts:say <japanese>
+    ├── say/SKILL.md               # /session-tts:say <japanese>
+    └── say/say.sh                 # /session-tts:say skill adapter (co-located with SKILL.md)
 ```
 
 The plugin is structured as a single **core** (`say-response.py`)
@@ -85,7 +85,7 @@ in the background.
 | ------------------------------------ | ----------------------------------------------- | -------------------------------------------- |
 | `scripts/dispatch.sh`                | Stop / StopFailure hook stdin (JSON)            | speaks `last_assistant_message`              |
 | `scripts/notify-permission.sh`       | `Notification:permission_prompt` hook stdin     | speaks `${basename(cwd)}で承認待ちです。`    |
-| `scripts/say-skill.sh`               | `/session-tts:say` skill argv                   | speaks argv[1] verbatim                      |
+| `skills/say/say.sh`                  | `/session-tts:say` skill argv                   | speaks argv[1] verbatim                      |
 | `scripts/session-on.sh` (special)    | `SessionStart` hook stdin                       | speaks "TTSを開始します。" (1st run only) + injects guidance via stdout |
 | `scripts/remind-say-on-todo.sh`      | `PostToolUse:TodoWrite` hook stdin              | injects `hookSpecificOutput.additionalContext` reminder (does not speak) |
 
@@ -399,10 +399,13 @@ on its own — it is purely user-driven.
 
 ### 11.2 `/session-tts:say <japanese>`
 
-Model-invocable. Wraps `scripts/say-skill.sh "$1"`, which goes through
-the same `resolve_speaker` → `speak_text` path as the hooks. If the
-session is silenced, `resolve_speaker` returns failure and the skill
-exits without speaking.
+Model-invocable. Wraps `skills/say/say.sh "$1"`, which goes through the
+same `resolve_speaker` → `speak_text` path as the hooks. The adapter
+lives next to its SKILL.md, and resolves the plugin root from
+`BASH_SOURCE` because `CLAUDE_PLUGIN_ROOT` is unset under Bash-tool
+invocation (it is only set for hook invocations). If the session is
+silenced, `resolve_speaker` returns failure and the skill exits without
+speaking.
 
 ## 12. Concurrency model and invariants
 
