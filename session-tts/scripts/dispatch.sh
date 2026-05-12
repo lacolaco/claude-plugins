@@ -19,19 +19,29 @@ set -e
 
 input=$(cat)
 session_id=$(printf '%s' "$input" | jq -r '.session_id // empty')
-stop_hook_active=$(printf '%s' "$input" | jq -r '.stop_hook_active // false')
 
 data_dir="$HOME/.claude/session-tts"
 [ -z "$session_id" ] && exit 0
 [ ! -e "$data_dir/sessions/$session_id" ] && exit 0
 [ -e "$data_dir/silenced/$session_id" ] && exit 0
 
-# Second firing of the Stop hook within the same logical turn (because
-# we blocked the first one and Claude did its follow-up). Now let the
-# turn truly end — no audio nag, no infinite loop.
-if [ "$stop_hook_active" = "true" ]; then
+# Loop guard: file-based "did I just block?" flag. Per Claude Code docs,
+# `stop_hook_active=true` is supposed to mark the second firing of the
+# same Stop chain, but in practice (observed in interactive testing) it
+# is not always passed through, leading to an infinite block loop. Trust
+# only the flag we ourselves write here.
+blocked_flag_dir="$data_dir/stop-blocked"
+blocked_flag="$blocked_flag_dir/$session_id"
+if [ -f "$blocked_flag" ]; then
+  rm -f "$blocked_flag"
   exit 0
 fi
+mkdir -p "$blocked_flag_dir"
+touch "$blocked_flag"
+
+# Save the payload for debugging when something looks off — keep only
+# the most recent one per session so disk usage stays bounded.
+printf '%s' "$input" > "$data_dir/last-stop-payload.json" 2>/dev/null || true
 
 plugin_root="${CLAUDE_PLUGIN_ROOT}"
 # Stop hook schema only supports: decision, reason, continue,
@@ -40,5 +50,5 @@ plugin_root="${CLAUDE_PLUGIN_ROOT}"
 # PostToolBatch only — Stop must put its instruction text in `reason`.
 jq -n --arg cmd "bash \"$plugin_root/skills/say/say.sh\" \"<phrase>\"" '{
   decision: "block",
-  reason: ("[session-tts] Before this turn truly ends, summarize what you just did in ONE short Japanese phrase (≤100 chars, open with a lead-in like 「報告です。」/「完了です。」/「方針転換です。」) and speak it RIGHT NOW by calling: `" + $cmd + "`. run_in_background=true is REQUIRED. After that one Bash call, produce a brief acknowledgement text and stop — do not start new work. (The Stop hook will fire again with stop_hook_active=true and let the turn end cleanly.) Skip the say call only if you already invoked say.sh in the immediately preceding step with the same conclusion; in that case just stop.")
+  reason: ("[session-tts] Before this turn ends, summarize what you just did in ONE short Japanese phrase (≤100 chars, open with a lead-in like 「報告です。」/「完了です。」/「方針転換です。」). Speak it by calling the **Bash tool** with these EXACT parameters:\n\n  command: " + $cmd + "\n  run_in_background: true\n  description: \"TTS turn summary\"\n\nThe `run_in_background: true` parameter (NOT a shell `&`) is REQUIRED so the turn does not block on synthesis. After that single Bash call, output a brief one-line acknowledgement and stop — do not start new work, do not investigate, do not call any other tool. (The Stop hook will fire again with stop_hook_active=true and let the turn end cleanly.) Skip the Bash call ONLY if you already invoked say.sh with the same conclusion earlier in this turn; in that case just stop.")
 }'
