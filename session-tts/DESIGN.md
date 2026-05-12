@@ -65,7 +65,7 @@ adapter (hook stdin / skill arg)
   → resolve_speaker (lib/voice-context.sh)
   → speak_text (lib/voice-context.sh)
   → say-response.py (stdin = text, env = speaker)
-      ├── wait_for_previous_playback (queue)
+      ├── kill_previous_playback (preempt)
       ├── clean()              # strip markdown
       ├── split_into_chunks()  # paragraph → sentence/clause
       ├── synth_worker  ──┐
@@ -158,9 +158,11 @@ Invariants:
 - `playback/<session_id>` reflects the most-recently-launched
   `say-response.py` process group **for that session**. Different
   sessions have separate pidfiles. All utterance types within a
-  session share this one pidfile and queue uniformly. Stale entries
-  are harmless because `wait_for_previous_playback` treats
-  `ProcessLookupError` from `os.killpg(pgid, 0)` as "slot is free".
+  session share this one pidfile and preempt uniformly: a new
+  utterance SIGTERMs the recorded group, then registers itself.
+  Stale entries are harmless because `kill_previous_playback`
+  swallows both `ProcessLookupError` and `PermissionError` from
+  `os.killpg`.
 
 ## 5. Voice assignment
 
@@ -288,55 +290,52 @@ Multi-paragraph answers get sped up so they don't drag.
 ## 8. Single-flight playback (per session)
 
 A new utterance must coordinate with any **in-progress utterance from
-the same session**. The rule is uniform: **everything queues, nothing
-is killed**. Every entry point — Stop / StopFailure hook,
-Notification:permission_prompt hook, and mid-turn say.sh — shares one
-per-session pidfile, and a new utterance polls that pidfile until the
-recorded process group is gone, then registers itself.
+the same session**. The rule is uniform: **the newest utterance
+preempts the previous one**. Every entry point — Stop / StopFailure
+hook, Notification:permission_prompt hook, and mid-turn say.sh —
+shares one per-session pidfile, and a new utterance SIGTERMs the
+recorded process group before claiming the file.
 
-Earlier designs split coordination by scope (Stop hook preempts, mid-
-turn queues, Stop waits for mid-turn) but the resulting matrix of
-asymmetric rules was hard to reason about and the user-perceived
-behavior — "two voices speaking at the same time" or "the mid-turn
-report disappeared" — kept regressing. Uniform queue beats clever
-preempt.
+Why preempt rather than queue: the mid-turn use case is "what is
+Claude doing right now". If a new report is ready while the previous
+one is still playing, the previous one is by definition stale and
+forcing the user to listen through it before hearing the current
+state hurts the very signal the plugin exists to deliver. Queueing
+also let stale audio outlast its turn — the Stop hook for turn N+1
+would still be talking about turn N. Preempt keeps audio aligned
+with what the user actually wants to hear.
 
-Trade-off: an old utterance is never cut short, even if it has been
-superseded by a fresher one. In practice this almost never matters
-because each turn produces a single Stop-hook reading, and mid-turn
-say is short (≤100 Japanese chars, a few seconds).
-
-Different sessions also never preempt each other — that would defeat
-the per-session voice rotation by making only the most-recent session
-audible.
+Different sessions never preempt each other — that would defeat the
+per-session voice rotation by making only the most-recent session
+audible. The pidfile is per-session.
 
 Implementation uses POSIX process groups and a per-session pidfile:
 
 1. The core reads `SESSION_TTS_SESSION_ID` from env and constructs
    `PIDFILE = ~/.claude/session-tts/playback/<session_id>`.
-2. `wait_for_previous_playback()` polls `PIDFILE` with `signal 0`
-   (`os.killpg(pgid, 0)` — existence check, no signal delivered).
-   When the recorded process group is gone, it returns. While the
-   previous group is still alive, it sleeps in 0.2 s ticks.
+2. `kill_previous_playback()` reads `PIDFILE` and sends `SIGTERM` to
+   the recorded process group (`os.killpg(pgid, signal.SIGTERM)`),
+   bringing down the previous python adapter and its `afplay` child
+   together. Errors (`ProcessLookupError`, `PermissionError`) mean
+   the slot is already free and are swallowed.
 3. `register_self()` calls `os.setpgrp()` (becoming a new
    process-group leader) and writes its PID to `PIDFILE`. The PID
    doubles as the new process-group leader id, so the next utterance
-   can `killpg(pgid, 0)` against it.
-4. On clean exit, `clear_self()` removes its own pidfile entry.
+   can `killpg` against it.
+4. On clean exit, `clear_self()` removes its own pidfile entry — but
+   only if the recorded PID still matches its own, so a later
+   utterance that has already overwritten the file is not affected
+   by the previous adapter's cleanup.
 
-`os.killpg` is still the right tool for the existence check (over
-`os.kill` against the bare pid) because each utterance becomes a
-process-group leader via `setpgrp()`; checking the group includes
-the child `afplay`.
+`os.killpg` (rather than `os.kill` against the bare pid) is required
+because each utterance becomes a process-group leader via `setpgrp()`;
+SIGTERMing the group is what brings down the child `afplay` along
+with the python parent.
 
 If `SESSION_TTS_SESSION_ID` is missing (defensive — should not happen
-in practice because every adapter passes it), the queue degrades to
-"no coordination at all" rather than blocking forever. Better to risk
-a brief overlap than to deadlock on a missing key.
-
-Stale pidfile entries are harmless because both `os.killpg` errors
-(`ProcessLookupError`, `PermissionError`) are swallowed and read as
-"slot is free".
+in practice because every adapter passes it), preemption degrades to
+"no coordination at all" rather than failing. Better to risk a brief
+overlap than to block on a missing key.
 
 ## 9. Hook subscriptions
 
