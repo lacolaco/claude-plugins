@@ -34,11 +34,11 @@ if [ "$stop_hook_active" = "true" ]; then
 fi
 
 plugin_root="${CLAUDE_PLUGIN_ROOT}"
+# Stop hook schema only supports: decision, reason, continue,
+# suppressOutput, stopReason, systemMessage. hookSpecificOutput /
+# additionalContext are PreToolUse / PostToolUse / UserPromptSubmit /
+# PostToolBatch only — Stop must put its instruction text in `reason`.
 jq -n --arg cmd "bash \"$plugin_root/skills/say/say.sh\" \"<phrase>\"" '{
   decision: "block",
-  reason: "session-tts: speak a one-line summary of the turn before stopping",
-  hookSpecificOutput: {
-    hookEventName: "Stop",
-    additionalContext: ("[session-tts] Before this turn truly ends, summarize what you just did in ONE short Japanese phrase (≤100 chars, open with a lead-in like 「報告です。」/「完了です。」/「方針転換です。」) and speak it RIGHT NOW by calling: `" + $cmd + "`. run_in_background=true is REQUIRED. After that one Bash call, produce a brief acknowledgement text and stop — do not start new work. (The Stop hook will fire again with stop_hook_active=true and let the turn end cleanly.) Skip the say call only if you already invoked say.sh in the immediately preceding step with the same conclusion; in that case just stop.")
-  }
+  reason: ("[session-tts] Before this turn truly ends, summarize what you just did in ONE short Japanese phrase (≤100 chars, open with a lead-in like 「報告です。」/「完了です。」/「方針転換です。」) and speak it RIGHT NOW by calling: `" + $cmd + "`. run_in_background=true is REQUIRED. After that one Bash call, produce a brief acknowledgement text and stop — do not start new work. (The Stop hook will fire again with stop_hook_active=true and let the turn end cleanly.) Skip the say call only if you already invoked say.sh in the immediately preceding step with the same conclusion; in that case just stop.")
 }'
