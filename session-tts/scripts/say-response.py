@@ -17,6 +17,7 @@ from __future__ import annotations
 import os
 import queue
 import re
+import signal
 import subprocess
 import sys
 import tempfile
@@ -57,12 +58,13 @@ TRUNCATION_NOTICE = "以下、省略します。"
 # follow the system "alert volume"; this is the simplest substitute.
 PLAYBACK_VOLUME = "0.8"
 
-# Per-session pidfile. Every utterance from this session — Stop hook,
-# Notification hook, or mid-turn say.sh — queues on the same file. A
-# new instance polls the pidfile until the recorded process group is
-# gone, then registers itself. Nothing kills anything. Concurrent
-# sessions still have independent pidfiles (the per-session voice
-# rotation is what makes parallel sessions distinguishable by ear).
+# Per-session pidfile. Holds the process-group id of the most recent
+# in-flight playback for this session. A new utterance reads the file,
+# SIGTERMs the recorded group (bringing down the previous python adapter
+# and its afplay child together), then registers itself — so the latest
+# utterance always wins and the user never has to wait through stale
+# audio before hearing the new report. Concurrent sessions still have
+# independent pidfiles, so cross-session playback is unaffected.
 PIDFILE_DIR = os.path.expanduser("~/.claude/session-tts/playback")
 PIDFILE = os.path.join(PIDFILE_DIR, SESSION_ID) if SESSION_ID else ""
 
@@ -230,29 +232,26 @@ def split_into_chunks(text: str) -> list[str]:
 # --- single-flight playback ------------------------------------------------
 
 
-def wait_for_previous_playback(poll_interval: float = 0.2) -> None:
-    """Block until the playback recorded in `PIDFILE` finishes.
+def kill_previous_playback() -> None:
+    """SIGTERM any in-flight playback from this session.
 
     All utterances for this session — Stop hook, Notification hook,
-    mid-turn say — share the same pidfile and queue uniformly. The
-    next utterance polls the pidfile with `signal 0` until the
-    recorded process group is gone, then registers itself.
+    mid-turn say — share the same pidfile. A new utterance kills the
+    previous one outright instead of queueing behind it, so the latest
+    report always takes over immediately and stale audio is never left
+    playing when the user has already moved on.
     """
-    import time
-
     if not PIDFILE:
         return
-    while True:
-        try:
-            with open(PIDFILE) as f:
-                old_pgid = int(f.read().strip())
-        except (FileNotFoundError, ValueError):
-            return
-        try:
-            os.killpg(old_pgid, 0)
-        except (ProcessLookupError, PermissionError):
-            return
-        time.sleep(poll_interval)
+    try:
+        with open(PIDFILE) as f:
+            old_pgid = int(f.read().strip())
+    except (FileNotFoundError, ValueError):
+        return
+    try:
+        os.killpg(old_pgid, signal.SIGTERM)
+    except (ProcessLookupError, PermissionError):
+        pass
 
 
 def register_self() -> None:
@@ -360,10 +359,11 @@ def main() -> None:
     if len(chunks) > MAX_CHUNKS:
         chunks = chunks[:MAX_CHUNKS] + [TRUNCATION_NOTICE]
 
-    # Every utterance queues behind the previous one for this session.
-    # Nothing is killed; Stop hooks, Notification hooks, and mid-turn
-    # say.sh all wait their turn on the same pidfile.
-    wait_for_previous_playback()
+    # New utterance wins: kill any in-flight playback for this session
+    # (Stop hook, Notification hook, prior mid-turn say) before claiming
+    # the pidfile, so the latest report takes over immediately instead
+    # of waiting through stale audio.
+    kill_previous_playback()
     register_self()
     try:
         with httpx.Client(base_url=ENGINE_BASE_URL, timeout=60.0) as client:
