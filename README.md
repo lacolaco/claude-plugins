@@ -105,8 +105,8 @@ Reads Claude Code's responses aloud on your local machine. Each Claude Code sess
 The plugin subscribes to five hook events:
 
 - **`SessionStart`** — assigns this session a voice from the 3-slot rotation (the assignment is stored at `~/.claude/session-tts/sessions/$session_id` and stays stable across `clear`/`compact` re-fires). It also kicks off a background engine bootstrap that is idempotent: typical re-runs do nothing.
-- **`Stop`** — fires when Claude finishes a normal response; speaks `last_assistant_message`
-- **`StopFailure`** — fires when the turn ends due to an API error; speaks `last_assistant_message`
+- **`Stop`** — fires when Claude finishes a normal response. Does **not** speak directly. Injects a reminder via `hookSpecificOutput.additionalContext` asking Claude to summarize the just-finished turn in one short Japanese phrase via mid-turn say at the start of the next turn. (Reading `last_assistant_message` aloud in full was too long.)
+- **`StopFailure`** — same as Stop, for turns ended by API errors.
 - **`Notification`** with the `permission_prompt` matcher only — a tool needs approval → speaks 「<workspace>で承認待ちです」, where `<workspace>` is the basename of `cwd` from the hook input (e.g. 「claude-pluginsで承認待ちです」). Falls back to 「承認待ちです。」 if `cwd` is missing. (Other Notification subtypes including `idle_prompt` are intentionally not subscribed.)
 - **Reminder hooks** (do not speak, only inject context):
   - **`PostToolUse:TodoWrite`** — task transition: nudge to narrate completion → next task
@@ -121,7 +121,7 @@ On the first session ever, the SessionStart hook downloads the local TTS engine 
 
 The plugin is structured around a single **core**, `scripts/say-response.py`, that takes plain UTF-8 text on stdin and a per-session voice via `SESSION_TTS_SPEAKER_ID` env. It:
 
-- **Queues** behind any in-progress playback from the same session — every entry point (Stop hook, Notification hook, mid-turn say.sh) shares one per-session pidfile and the next utterance polls until the recorded process group is gone, then plays. Nothing is killed. Concurrent sessions still have independent pidfiles and never silence each other.
+- **Queues** behind any in-progress playback from the same session — every entry point that actually speaks (Notification hook, mid-turn say.sh; Stop is now reminder-only) shares one per-session pidfile and the next utterance polls until the recorded process group is gone, then plays. Nothing is killed. Concurrent sessions still have independent pidfiles and never silence each other.
 - Strips Markdown (code blocks, tables, URLs, parentheses, etc.)
 - Splits text on **paragraph boundaries first**, then sentence/clause boundaries inside each paragraph. The first chunk is intentionally small (≤ 60 chars) so the first audible word arrives quickly even on long responses; later chunks are larger (≤ 250 chars) for natural cadence. Markdown headings (`## title`) are *not* emitted as their own paragraph — the heading text is folded into the next paragraph with a `。` separator, so a single-word heading does not become a 2-character chunk bracketed by audible silence (`prePhonemeLength` pad + `afplay` device-open overhead per chunk).
 - Synthesizes chunks via the local engine's HTTP API over a keep-alive `httpx.Client` and pushes each WAV onto a playback queue so audio starts as soon as the first chunk is ready (synthesis and playback run in parallel)
@@ -131,7 +131,7 @@ Around the core are thin **adapters**, one per input source. Each adapter is res
 
 | Adapter | Input source | Text / Output |
 |---------|--------------|------|
-| `scripts/dispatch.sh` | Stop / StopFailure hook payload (stdin JSON) | `last_assistant_message` (spoken) |
+| `scripts/dispatch.sh` | Stop / StopFailure hook payload (stdin JSON) | JSON `additionalContext` reminder asking Claude to summarize at the start of next turn (not spoken) |
 | `scripts/notify-permission.sh` | Notification:permission_prompt payload | `<workspace>で承認待ちです。` (spoken) |
 | `skills/say/say.sh` | Bash tool argv (called by Claude with `run_in_background=true` for mid-turn narration) | the argument verbatim (spoken) |
 | `scripts/remind-say.sh <trigger>` | hook stdin (one of: TodoWrite, Monitor, Agent, UserPromptSubmit) | JSON `additionalContext` reminder (todo/monitor/agent) or plain stdout (prompt). Not spoken. |
@@ -159,7 +159,7 @@ Why this shape:
 - **Non-blocking**: `run_in_background=true` returns immediately with just the "Command running in background" line — synthesis and playback proceed in a detached process so the next tool call is never blocked.
 - **Minimal context**: only the Bash tool call + its short background-spawn line stay in the main transcript. No SKILL.md body, no sub-agent transcript.
 
-`skills/say/say.sh` is the same implementation used by the Stop / Notification hook adapters; it goes through `voice-context.sh::resolve_speaker` → `speak_text` and is automatically a no-op if the session has been silenced via `/session-tts:tts off`.
+`skills/say/say.sh` is the same implementation used by the Notification hook adapter; it goes through `voice-context.sh::resolve_speaker` → `speak_text` and is automatically a no-op if the session has been silenced via `/session-tts:tts off`. (The Stop hook no longer drives playback directly — it now injects a reminder so that the next-turn Claude does the speaking via this same path.)
 
 Suggested calling moments:
 
@@ -188,7 +188,7 @@ Voice is ON by default in every new session. Use the `/session-tts:tts` skill to
 /session-tts:tts status  # show current state (default)
 ```
 
-The skill toggles `~/.claude/session-tts/silenced/$CLAUDE_CODE_SESSION_ID` and is independent of the voice assignment, so silencing then re-enabling preserves the same voice. Switching to `off` additionally kills any utterance still playing for this session (via the per-session playback pidfile), so the silence takes effect immediately rather than draining the remaining chunk queue. Other concurrent sessions are unaffected. The same flag is honored by `say.sh` (used by both the mid-turn narration call described above and the Stop / Notification hook adapters), so silenced sessions stay silent across every entry point.
+The skill toggles `~/.claude/session-tts/silenced/$CLAUDE_CODE_SESSION_ID` and is independent of the voice assignment, so silencing then re-enabling preserves the same voice. Switching to `off` additionally kills any utterance still playing for this session (via the per-session playback pidfile), so the silence takes effect immediately rather than draining the remaining chunk queue. Other concurrent sessions are unaffected. The same flag is honored by `say.sh` (used by mid-turn narration and the Notification hook), and the Stop hook's reminder script also exits early when silenced — so silenced sessions stay silent across every entry point.
 
 ### Installation
 

@@ -36,7 +36,7 @@ session-tts/
 ├── hooks/hooks.json               # hook subscriptions (SessionStart / Stop / StopFailure / Notification / PreToolUse / PostToolUse / UserPromptSubmit)
 ├── scripts/
 │   ├── session-on.sh              # SessionStart adapter (voice rotation + engine bootstrap)
-│   ├── dispatch.sh                # Stop / StopFailure adapter
+│   ├── dispatch.sh                # Stop / StopFailure adapter — reminder-only (asks Claude to summarize the turn via mid-turn say)
 │   ├── notify-permission.sh       # Notification:permission_prompt adapter
 │   ├── remind-say.sh              # Reminder adapter for PostToolUse:TodoWrite, PreToolUse:Monitor, PreToolUse:Agent, UserPromptSubmit (trigger passed as argv[1])
 │   ├── say-response.py            # CORE: text → audio
@@ -84,7 +84,7 @@ in the background.
 
 | Adapter                              | Input contract                                  | Output                                       |
 | ------------------------------------ | ----------------------------------------------- | -------------------------------------------- |
-| `scripts/dispatch.sh`                | Stop / StopFailure hook stdin (JSON)            | speaks `last_assistant_message`              |
+| `scripts/dispatch.sh`                | Stop / StopFailure hook stdin (JSON)            | injects `hookSpecificOutput.additionalContext` reminding the next-turn model to summarize the previous turn via mid-turn say (does not speak) |
 | `scripts/notify-permission.sh`       | `Notification:permission_prompt` hook stdin     | speaks `${basename(cwd)}で承認待ちです。`    |
 | `skills/say/say.sh`                  | Bash tool argv (model-driven, `run_in_background=true`) | speaks argv[1] verbatim              |
 | `scripts/session-on.sh` (special)    | `SessionStart` hook stdin                       | speaks "TTSを開始します。" (1st run only) + injects guidance via stdout |
@@ -216,9 +216,10 @@ session start.
 
 ### 7.1 Cleanup (`clean`)
 
-The Stop hook hands us `last_assistant_message`, which is Markdown.
-Reading Markdown verbatim sounds awful (asterisks, backticks, table
-pipes, fenced code blocks), so we strip aggressively *before* chunking.
+Mid-turn say arguments and Notification:permission_prompt fixed phrases
+are mostly plain text already, but inputs originally from the model
+(now mostly via the model-authored mid-turn say argument) can still
+carry Markdown remnants, so we strip aggressively *before* chunking.
 
 Stripped:
 
@@ -289,10 +290,12 @@ Multi-paragraph answers get sped up so they don't drag.
 
 A new utterance must coordinate with any **in-progress utterance from
 the same session**. The rule is uniform: **everything queues, nothing
-is killed**. Every entry point — Stop / StopFailure hook,
-Notification:permission_prompt hook, and mid-turn say.sh — shares one
+is killed**. Every entry point that actually produces audio — the
+Notification:permission_prompt hook and mid-turn say.sh — shares one
 per-session pidfile, and a new utterance polls that pidfile until the
-recorded process group is gone, then registers itself.
+recorded process group is gone, then registers itself. (Stop /
+StopFailure no longer produce audio; they inject a reminder so the
+next-turn Claude summarizes via the same mid-turn say path.)
 
 Earlier designs split coordination by scope (Stop hook preempts, mid-
 turn queues, Stop waits for mid-turn) but the resulting matrix of
@@ -348,8 +351,8 @@ the model before the next response.
 | Event                                      | Adapter                       | async | Notes                                                                                  |
 | ------------------------------------------ | ----------------------------- | ----- | -------------------------------------------------------------------------------------- |
 | `SessionStart`                             | `session-on.sh`               | no    | voice rotation, instruction injection via stdout, self-backgrounded engine bootstrap   |
-| `Stop`                                     | `dispatch.sh`                 | yes   | normal turn end; speaks `last_assistant_message`                                       |
-| `StopFailure`                              | `dispatch.sh`                 | yes   | turn ended due to API error; speaks `last_assistant_message`                           |
+| `Stop`                                     | `dispatch.sh`                 | no    | does not speak; injects reminder for the next turn to summarize via mid-turn say        |
+| `StopFailure`                              | `dispatch.sh`                 | no    | same, for turns ended by API error                                                      |
 | `Notification` matcher `permission_prompt` | `notify-permission.sh`        | yes   | tool needs approval; speaks workspace-aware Japanese phrase                            |
 | `PostToolUse` matcher `TodoWrite`          | `remind-say.sh todo`          | no    | does not speak; reminds the model to narrate the task transition                       |
 | `PreToolUse` matcher `Monitor`             | `remind-say.sh monitor`       | no    | does not speak; reminds the model to narrate what is being monitored and why           |

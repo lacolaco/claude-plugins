@@ -25,8 +25,8 @@
     },
     {
       "name": "session-tts",
-      "description": "Read Claude Code responses aloud locally with a different Japanese voice per session. Instructs Claude to deliver mid-turn progress narration via Bash with run_in_background=true (non-blocking, minimal context impact), plus a TodoWrite hook that nudges narration at task transitions. Permission prompts include the workspace name. ON by default; engine and models are managed automatically. Apple Silicon only.",
-      "version": "0.7.3",
+      "description": "Read Claude Code-related audio cues locally with a different Japanese voice per session. The Stop hook injects a reminder asking Claude to summarize each turn in one short phrase via mid-turn say; permission prompts are narrated with the workspace name. Multiple hook reminders (TodoWrite/Monitor/Agent/UserPromptSubmit) nudge progress narration at milestones. ON by default; engine and models managed automatically. Apple Silicon only.",
+      "version": "0.8.0",
       "source": "./session-tts"
     }
   ]
