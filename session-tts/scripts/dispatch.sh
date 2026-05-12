@@ -1,18 +1,21 @@
 #!/bin/bash
-# Stop / StopFailure hook adapter — intentionally a no-op.
+# Stop / StopFailure hook adapter.
 #
-# Previous designs (full-text playback / decision:block / reminder
-# injection) all had unacceptable trade-offs:
-#   - Full-text playback: too long, multi-paragraph responses ran tens
-#     of seconds of audio.
-#   - decision:block: forced Claude to take an extra action inside the
-#     turn, which fired Stop again, looped, and added two redundant
-#     "acknowledge" lines per turn for nothing.
-#   - additionalContext on Stop: only readable on the NEXT turn, so the
-#     audio came too late to be useful.
-#
-# The Stop hook is therefore intentionally silent. Turn-end audio is
-# delegated entirely to the mid-turn `say.sh` path that the model
-# invokes from inside the turn (driven by SessionStart guidance and
-# the remind-say.sh reminders).
-exit 0
+# Reads the hook payload, takes `last_assistant_message`, and speaks it
+# through the shared voice context. No `decision: block`, no loop, no
+# next-turn deferral — just the same direct playback path the Stop hook
+# has used since v0.7.3.
+
+set -e
+
+# shellcheck source=lib/voice-context.sh
+. "${CLAUDE_PLUGIN_ROOT}/scripts/lib/voice-context.sh"
+
+input=$(cat)
+session_id=$(printf '%s' "$input" | jq -r '.session_id // empty')
+text=$(printf '%s' "$input" | jq -r '.last_assistant_message // empty')
+
+[ -z "$text" ] && exit 0
+
+speaker_id=$(resolve_speaker "$session_id") || exit 0
+speak_text "$speaker_id" "$text" "$session_id"
