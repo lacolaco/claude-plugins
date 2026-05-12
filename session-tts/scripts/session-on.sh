@@ -84,9 +84,8 @@ Examples (lead-in + body, adapt to the actual work):
 Avoid:
 - Mechanical tool announcements (e.g.「ファイルを読みます」「Bash実行します」)
 - Per-tool narration; report at the milestone, not at each step
-- The final response of a turn (Stop hook narrates the final paragraph
-  of the assistant message automatically — write a short end-of-turn
-  wrap-up sentence as the last paragraph and Stop will speak it)
+- The final response of a turn (Stop hook narrates the final assistant
+  message automatically)
 
 say.sh itself is a no-op if TTS has been silenced via /session-tts:tts off,
 so it's safe to call it without checking silence status.
