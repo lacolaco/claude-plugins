@@ -84,6 +84,12 @@ def _strip_inline_markdown(text: str) -> str:
         text = text.replace(ch, "")
     # Bare URLs that aren't part of a markdown link.
     text = re.sub(r"https?://\S+", "", text)
+    # Inline `.` (e.g. `say.sh`, `src/foo.tsx`, `0.7.3`, `127.0.0.1`) is read by
+    # the engine as a sentence boundary and chops the surrounding text apart
+    # with a long pause. Replace it with a space so the parts speak as adjacent
+    # tokens. A sentence-ending `.` (followed by whitespace or end of string) is
+    # left alone so real sentence breaks still get their pause.
+    text = re.sub(r"\.(?=\S)", " ", text)
     return " ".join(text.split()).strip()
 
 
