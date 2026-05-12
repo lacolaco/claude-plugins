@@ -1,22 +1,16 @@
 #!/bin/bash
 # Stop / StopFailure hook adapter.
 #
-# Does NOT speak. Returns hookSpecificOutput.additionalContext so Claude
-# Code injects a reminder into the model's context, nudging it to
-# summarize the just-finished turn in one short Japanese phrase and
-# announce it via the mid-turn say path at the START of the next turn.
+# Uses Claude Code's `decision: "block"` mechanism to make Claude run
+# ONE more action — a mid-turn say with a short Japanese summary —
+# *inside the same turn* before the turn truly stops. The hook fires
+# again after Claude's follow-up action, and the second firing sees
+# `stop_hook_active=true` and exits cleanly (no infinite loop).
 #
-# Why a reminder instead of direct full-text playback: reading the
-# entire `last_assistant_message` aloud is too long — assistant
-# responses run multiple paragraphs and the read-aloud takes tens of
-# seconds. A model-authored summary is concise (≤100 chars) and serves
-# as the audio sign-off for the turn that just ended.
-#
-# Trade-off: the audio fires when the NEXT turn starts (i.e. when the
-# user submits the next message), not the moment the previous turn
-# ended. The instant-feedback property of full-text Stop-hook playback
-# is gone; in exchange the audio is short and the model decides what's
-# worth saying.
+# Why not just stream `last_assistant_message`: full-text playback ran
+# tens of seconds on multi-paragraph responses, way too long. Letting
+# Claude author its own one-line summary, then speaking THAT, gives
+# the instant audio feedback the user wants without dragging.
 #
 # No-op when the session has no voice assigned or has been silenced via
 # /session-tts:tts off.
@@ -25,16 +19,26 @@ set -e
 
 input=$(cat)
 session_id=$(printf '%s' "$input" | jq -r '.session_id // empty')
+stop_hook_active=$(printf '%s' "$input" | jq -r '.stop_hook_active // false')
 
 data_dir="$HOME/.claude/session-tts"
 [ -z "$session_id" ] && exit 0
 [ ! -e "$data_dir/sessions/$session_id" ] && exit 0
 [ -e "$data_dir/silenced/$session_id" ] && exit 0
 
+# Second firing of the Stop hook within the same logical turn (because
+# we blocked the first one and Claude did its follow-up). Now let the
+# turn truly end — no audio nag, no infinite loop.
+if [ "$stop_hook_active" = "true" ]; then
+  exit 0
+fi
+
 plugin_root="${CLAUDE_PLUGIN_ROOT}"
 jq -n --arg cmd "bash \"$plugin_root/skills/say/say.sh\" \"<phrase>\"" '{
+  decision: "block",
+  reason: "session-tts: speak a one-line summary of the turn before stopping",
   hookSpecificOutput: {
     hookEventName: "Stop",
-    additionalContext: ("[session-tts] The previous turn just ended. Before responding to the new user prompt, summarize what you accomplished (or attempted) in that previous turn in ONE short Japanese phrase (≤100 chars, with a lead-in like 「報告です。」/「完了です。」/「方針転換です。」 etc.) and speak it via: `" + $cmd + "`. run_in_background=true is REQUIRED. After speaking, proceed to the user prompt normally. Skip if you already narrated the same conclusion in the previous turn via mid-turn say.")
+    additionalContext: ("[session-tts] Before this turn truly ends, summarize what you just did in ONE short Japanese phrase (≤100 chars, open with a lead-in like 「報告です。」/「完了です。」/「方針転換です。」) and speak it RIGHT NOW by calling: `" + $cmd + "`. run_in_background=true is REQUIRED. After that one Bash call, produce a brief acknowledgement text and stop — do not start new work. (The Stop hook will fire again with stop_hook_active=true and let the turn end cleanly.) Skip the say call only if you already invoked say.sh in the immediately preceding step with the same conclusion; in that case just stop.")
   }
 }'
