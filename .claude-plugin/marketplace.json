@@ -25,7 +25,7 @@
     },
     {
       "name": "session-tts",
-      "description": "Read Claude Code-related audio cues locally with a different Japanese voice per session. The Stop hook injects a reminder asking Claude to summarize each turn in one short phrase via mid-turn say; permission prompts are narrated with the workspace name. Multiple hook reminders (TodoWrite/Monitor/Agent/UserPromptSubmit) nudge progress narration at milestones. ON by default; engine and models managed automatically. Apple Silicon only.",
+      "description": "Read Claude Code-related audio cues locally with a different Japanese voice per session. The Stop hook speaks only the end-of-turn final paragraph (Claude's wrap-up summary) so the audio stays short; mid-turn progress is narrated by Claude via /session-tts:say, nudged by reminder hooks (TodoWrite/Monitor/Agent/UserPromptSubmit). Permission prompts are narrated with the workspace name. ON by default; engine and models managed automatically. Apple Silicon only.",
       "version": "0.8.0",
       "source": "./session-tts"
     }
