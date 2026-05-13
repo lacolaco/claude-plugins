@@ -33,9 +33,10 @@ and the invariants that hold across hooks and skills.
 ```
 session-tts/
 ├── .claude-plugin/plugin.json     # plugin metadata
-├── hooks/hooks.json               # hook subscriptions (SessionStart / Stop / StopFailure / Notification / PreToolUse / PostToolUse / UserPromptSubmit)
+├── hooks/hooks.json               # hook subscriptions (SessionStart / SessionEnd / Stop / StopFailure / Notification / PreToolUse / PostToolUse / UserPromptSubmit)
 ├── scripts/
 │   ├── session-on.sh              # SessionStart adapter (voice rotation + engine bootstrap)
+│   ├── session-end.sh             # SessionEnd adapter (kills in-flight playback on /clear, /compact, logout)
 │   ├── dispatch.sh                # Stop / StopFailure adapter
 │   ├── notify-permission.sh       # Notification:permission_prompt adapter
 │   ├── remind-say.sh              # Reminder adapter for PostToolUse:TodoWrite, PreToolUse:Monitor, PreToolUse:Agent, UserPromptSubmit (trigger passed as argv[1])
@@ -88,6 +89,7 @@ in the background.
 | `scripts/notify-permission.sh`       | `Notification:permission_prompt` hook stdin     | speaks `${basename(cwd)}で承認待ちです。`    |
 | `skills/say/say.sh`                  | Bash tool argv (model-driven, `run_in_background=true`) | speaks argv[1] verbatim              |
 | `scripts/session-on.sh` (special)    | `SessionStart` hook stdin                       | speaks "TTSを開始します。" (1st run only) + injects guidance via stdout |
+| `scripts/session-end.sh`             | `SessionEnd` hook stdin                         | SIGTERMs the session's in-flight playback (does not speak) so audio doesn't outlive the session that started it |
 | `scripts/remind-say.sh todo`         | `PostToolUse:TodoWrite` hook stdin              | injects `hookSpecificOutput.additionalContext` reminder (does not speak) |
 | `scripts/remind-say.sh monitor`      | `PreToolUse:Monitor` hook stdin                 | injects reminder before a long watch starts (does not speak)              |
 | `scripts/remind-say.sh agent`        | `PreToolUse:Agent` hook stdin                   | injects reminder before sub-agent dispatch (does not speak)               |
