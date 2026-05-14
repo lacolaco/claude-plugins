@@ -584,7 +584,39 @@ To add another adapter (e.g. a new hook event, or a new skill):
 The core does not need to change. Hook payload shapes never leak past
 the adapter.
 
-## 15. Versioning
+## 15. Unit tests
+
+`python/tests/` holds pytest tests for the pure text-processing layer
+of `say-response.py` (`clean`, `_strip_inline_markdown`, `_force_split`,
+`split_into_chunks`). Each text-normalization rule is covered by a
+parametrized block so a regression points at the specific behavior
+that broke.
+
+Run locally:
+
+```sh
+cd session-tts/python
+uv sync --extra dev
+uv run pytest
+```
+
+CI: `.github/workflows/session-tts-python-tests.yml` runs the same on
+every push/PR that touches the Python runtime or the core script.
+
+Out of scope for these tests (intentionally — they need shell-level
+or live-engine harnesses):
+
+- Hook adapters (`scripts/*.sh`, `skills/*/*.sh`)
+- HTTP synthesis (`synth_chunk`, `synth_worker`)
+- Threading and `afplay` orchestration
+- Pidfile / process-group preemption
+- `setup_engine.py` (network + 7z extract)
+
+The pytest layer is the lower of two test tiers. Plugin behavior at
+the hook / live-audio level is still verified by `claude --plugin-dir
+<source>` per the repo's plugin testing convention.
+
+## 16. Versioning
 
 Per the repo's plugin checklist, behavior changes touch all of:
 
