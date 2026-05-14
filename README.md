@@ -9,7 +9,7 @@ Claude Code plugins by lacolaco.
 | [protect-main-branch](./protect-main-branch) | Prevent git operations that would modify the main branch (configurable) |
 | [session-handover](./session-handover) | Session handover/takeover for task continuity between sessions |
 | [retrospective](./retrospective) | Structured 6-stage retrospective for tasks, PRs, and incidents |
-| [session-tts](./session-tts) | Read Claude Code responses aloud locally with a different Japanese voice per session. Instructs Claude to deliver mid-turn progress narration via Bash with `run_in_background=true` (non-blocking, minimal context impact). Permission prompts include the workspace name. ON by default; engine and voices are managed automatically (Apple Silicon) |
+| [session-tts](./session-tts) | Read Claude Code responses aloud locally with a different Japanese voice per session. Instructs Claude to deliver mid-turn progress narration via a synchronous Bash call into the say adapter. Permission prompts include the workspace name. ON by default; engine and voices are managed automatically (Apple Silicon) |
 
 ## protect-main-branch
 
@@ -114,7 +114,7 @@ The plugin subscribes to six hook events:
   - **`PreToolUse:Monitor`** — about to watch a long-running background task: nudge to narrate what/why
   - **`PreToolUse:Agent`** — about to dispatch a sub-agent: nudge to narrate the delegated work + plan
   - **`UserPromptSubmit`** — new turn boundary: nudge to narrate at milestones if this becomes multi-step
-  All four dispatch through `scripts/remind-say.sh <trigger>` and return `hookSpecificOutput.additionalContext` (or, for UserPromptSubmit, stdout) reminding Claude to call `say.sh` via Bash with `run_in_background=true`. The model still owns wording and 枕詞. No-op when the session has no voice or has been silenced. High-frequency tools (Write/Edit/Bash) are deliberately not matched to avoid context spam.
+  All four dispatch through `scripts/remind-say.sh <trigger>` and return `hookSpecificOutput.additionalContext` (or, for UserPromptSubmit, stdout) reminding Claude to call `say.sh` via Bash synchronously (no `run_in_background`). The model still owns wording and 枕詞. No-op when the session has no voice or has been silenced. High-frequency tools (Write/Edit/Bash) are deliberately not matched to avoid context spam.
 
 On the first session ever, the SessionStart hook downloads the local TTS engine binary into `~/.claude/session-tts/engine/` and installs the three voice models. From then on it just probes the engine's health endpoint (sub-100 ms) and exits.
 
@@ -135,7 +135,7 @@ Around the core are thin **adapters**, one per input source. Each adapter is res
 |---------|--------------|------|
 | `scripts/dispatch.sh` | Stop / StopFailure hook payload (stdin JSON) | `last_assistant_message` (spoken) |
 | `scripts/notify-permission.sh` | Notification:permission_prompt payload | `<workspace>で承認待ちです。` (spoken) |
-| `skills/say/say.sh` | Bash tool argv (called by Claude with `run_in_background=true` for mid-turn narration) | the argument verbatim (spoken) |
+| `skills/say/say.sh` | Bash tool argv (called by Claude synchronously for mid-turn narration) | the argument verbatim (spoken) |
 | `scripts/remind-say.sh <trigger>` | hook stdin (one of: TodoWrite, Monitor, Agent, UserPromptSubmit) | JSON `additionalContext` reminder (todo/monitor/agent) or plain stdout (prompt). Not spoken. |
 
 The shared helper `scripts/lib/voice-context.sh` resolves the per-session speaker (or returns failure if the session has no voice or has been silenced) and forwards text to the core. Hook payload schemas never leak into the core.
@@ -146,20 +146,16 @@ The Python runtime is isolated under `python/` and managed by `uv`; adapters cal
 
 In addition to the hook-triggered narration of full responses, Claude is instructed to deliver **verbal task-progress reports during autonomous, multi-step work** so the user can follow progress by ear without reading every message.
 
-The model invokes `skills/say/say.sh` through the **Bash tool with `run_in_background=true`**:
+The model invokes `skills/say/say.sh` through the **Bash tool, synchronously** — `run_in_background` is intentionally not passed:
 
 ```
 Bash(
   command: bash "${CLAUDE_PLUGIN_ROOT}/skills/say/say.sh" "<lead-in + body, ≤100 Japanese chars>",
-  description: "TTS report",
-  run_in_background: true
+  description: "TTS report"
 )
 ```
 
-Why this shape:
-
-- **Non-blocking**: `run_in_background=true` returns immediately with just the "Command running in background" line — synthesis and playback proceed in a detached process so the next tool call is never blocked.
-- **Minimal context**: only the Bash tool call + its short background-spawn line stay in the main transcript. No SKILL.md body, no sub-agent transcript.
+The call blocks for the duration of synthesis + playback. The 100-character cap and milestone-only discipline keep that block short enough not to disrupt the turn.
 
 `skills/say/say.sh` is the same implementation used by the Stop / Notification hook adapters; it goes through `voice-context.sh::resolve_speaker` → `speak_text` and is automatically a no-op if the session has been silenced via `/session-tts:tts off`.
 
@@ -174,7 +170,7 @@ Constraints: under ~100 Japanese characters per call, one phrase per invocation,
 
 The plugin nudges Claude toward making this call via two mechanisms:
 
-1. A `SessionStart` instruction injected through the hook's stdout (declares the calling moments, lead-in rule, and the exact Bash + `run_in_background` shape).
+1. A `SessionStart` instruction injected through the hook's stdout (declares the calling moments, lead-in rule, and the exact synchronous Bash call shape).
 2. Four reminder hooks, all dispatched through `scripts/remind-say.sh <trigger>`, that re-surface the narration rule at point-in-time milestones — `PostToolUse:TodoWrite` (task transition), `PreToolUse:Monitor` (long watch starting), `PreToolUse:Agent` (sub-agent dispatch), `UserPromptSubmit` (new turn boundary). Each injects a short reminder via `hookSpecificOutput.additionalContext` (or stdout for UserPromptSubmit) and does not produce audio — the model owns wording and 枕詞 because hook payloads are typically English/terse and the engine is Japanese. Each reminder ends with `Skip if you just narrated in the immediately preceding step.` so the model self-throttles when several triggers fire close together.
 
 Actual frequency is still up to model judgment. `say.sh` itself is a no-op if TTS has been silenced via `/session-tts:tts off`, so accidental calls during silenced sessions don't produce audio.
