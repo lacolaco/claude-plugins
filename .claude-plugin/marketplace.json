@@ -26,7 +26,7 @@
     {
       "name": "session-tts",
       "description": "Read Claude Code responses aloud locally with a different Japanese voice per session. Instructs Claude to deliver mid-turn progress narration via a synchronous Bash call into the say adapter, plus a TodoWrite hook that nudges narration at task transitions. Permission prompts include the workspace name. ON by default; engine and models are managed automatically. Apple Silicon only.",
-      "version": "0.10.2",
+      "version": "0.10.3",
       "source": "./session-tts"
     }
   ]
