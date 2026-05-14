@@ -251,7 +251,19 @@ Stripped:
 Special-cased: list items keep their source paragraph (no extra `\n\n`)
 so playback flows naturally; instead each item gets a trailing `。` if
 it lacks one. That gives the synthesizer a clause-level pause between
-items without the longer paragraph-level gap.
+items without the longer paragraph-level gap. The same `。` insertion
+also runs **on the line that immediately precedes a list** when that
+line is not itself a list item — without it, a Markdown structure like
+
+```
+MR !108 (draft) <URL>
+  - first item
+  - second item
+```
+
+would join into `MR !108 (draft) first item second item` after URL
+stripping and the listener would hear the intro and the first item as
+one breathless phrase. The break gives the intro a proper clause end.
 
 Heading folding: a markdown heading paragraph (single line matching
 `#{1,6}\s+\S`) is *not* emitted on its own. Its cleaned text is held
@@ -282,6 +294,13 @@ Bounds:
   engine's "sweet spot" (the docs warn that `> 1000` chars per
   `/synthesis` call collapses prosody into monotone and may leak
   memory).
+- When a single sentence (one slice between terminal punctuation) is
+  itself longer than the budget, `_force_split` breaks it at the last
+  ASCII space before the limit instead of slicing mid-word
+  (`co|nsumer`). The breaking space stays on the left chunk so
+  `"".join(chunks[1:])` (used to re-flow the tail past the first
+  chunk) doesn't lose the word boundary. Falls back to a hard slice
+  only when the slice has no space at all (e.g. a long CJK run).
 - `MAX_CHUNKS = 8` — past this, chunks are dropped and a closing
   `「以下、省略します。」` is appended so the user hears the cut
   instead of an abrupt mid-sentence stop. Without this cap, a verbose

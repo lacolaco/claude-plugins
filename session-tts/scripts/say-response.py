@@ -84,8 +84,14 @@ def _strip_inline_markdown(text: str) -> str:
     # Heading and blockquote markers.
     for ch in ["#", ">"]:
         text = text.replace(ch, "")
-    # Bare URLs that aren't part of a markdown link.
-    text = re.sub(r"https?://\S+", "", text)
+    # Bare URLs that aren't part of a markdown link. Two boundary tweaks:
+    # (1) stop the URL match at Japanese terminal punctuation so a trailing
+    #     `。`/`、` attached by clean() (to mark a clause boundary before the
+    #     URL) isn't swallowed by the URL match;
+    # (2) eat any leading whitespace too, so the previous token (e.g. `(draft)`)
+    #     ends up directly adjacent to whatever clause break clean() inserted,
+    #     instead of being left with a dangling space before the punctuation.
+    text = re.sub(r"\s*https?://[^\s。．！？、，]+", "", text)
     # Inline `.` (e.g. `say.sh`, `src/foo.tsx`, `0.7.3`, `127.0.0.1`) is read by
     # the engine as a sentence boundary and chops the surrounding text apart
     # with a long pause. Replace it with a space so the parts speak as adjacent
@@ -165,6 +171,13 @@ def clean(text: str) -> str:
                 item_text = list_match.group(2).strip()
                 if not item_text:
                     continue
+                # If the previous accepted line was a non-list intro
+                # (e.g. `MR !108 (draft)`), it has no trailing 。 — without
+                # one, joining with " " runs the intro straight into this
+                # list item's text (`(draft) dispatchResults…`). Give it a
+                # clause break so the listener hears the boundary.
+                if cleaned and not cleaned[-1].endswith(_TERMINAL_PUNCT):
+                    cleaned[-1] += "。"
                 if not item_text.endswith(_TERMINAL_PUNCT):
                     item_text += "。"
                 cleaned.append(item_text)
@@ -192,6 +205,37 @@ def clean(text: str) -> str:
 # --- chunking --------------------------------------------------------------
 
 
+def _force_split(text: str, max_chars: int) -> list[str]:
+    """Split text longer than max_chars, preferring a whitespace boundary.
+
+    When a "sentence" (one slice between Japanese/ASCII terminal punctuation)
+    is itself longer than the chunk budget, we have to break it mid-sentence.
+    A naive fixed-width slice cuts English words in half (`co|nsumer`), which
+    sounds wrong. Instead, search backwards from `max_chars` for the last
+    space and break there. Fall back to a hard slice only when the slice has
+    no space at all (e.g. a long CJK run).
+
+    The breaking space is kept at the end of the preceding chunk so callers
+    that join chunks with `""` (as `split_into_chunks` does when re-flowing
+    the tail past the first chunk) don't lose the word boundary.
+    """
+    out: list[str] = []
+    while len(text) > max_chars:
+        split_at = text.rfind(" ", 0, max_chars + 1)
+        if split_at <= 0:
+            # No whitespace within the budget; hard slice.
+            out.append(text[:max_chars])
+            text = text[max_chars:]
+        else:
+            # Keep the breaking space on the LEFT chunk so concatenation
+            # with the next chunk preserves the original word boundary.
+            out.append(text[: split_at + 1])
+            text = text[split_at + 1 :]
+    if text:
+        out.append(text)
+    return out
+
+
 def _split_paragraph(text: str, max_chars: int) -> list[str]:
     parts = re.split(r"(?<=[。．！？!?、，,])\s*", text)
     chunks: list[str] = []
@@ -203,8 +247,7 @@ def _split_paragraph(text: str, max_chars: int) -> list[str]:
             if current:
                 chunks.append(current)
                 current = ""
-            for i in range(0, len(part), max_chars):
-                chunks.append(part[i : i + max_chars])
+            chunks.extend(_force_split(part, max_chars))
             continue
         if not current:
             current = part
