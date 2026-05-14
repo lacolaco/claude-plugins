@@ -234,6 +234,9 @@ Stripped:
 - Bare URLs (`https?://\S+`)
 - Markdown images (entirely; alt text rarely speaks well)
 - Markdown links (kept the label, dropped the URL)
+- Decorative dash runs of 2+ from `―—–─━` (e.g. ` Insight ―――`,
+  `━━━ section ━━━`) — collapsed to a single space. A lone `—` / `–`
+  is left alone so it can still function as prose punctuation.
 
 Special-cased: list items keep their source paragraph (no extra `\n\n`)
 so playback flows naturally; instead each item gets a trailing `。` if
