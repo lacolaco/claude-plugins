@@ -92,6 +92,13 @@ def _strip_inline_markdown(text: str) -> str:
     # tokens. A sentence-ending `.` (followed by whitespace or end of string) is
     # left alone so real sentence breaks still get their pause.
     text = re.sub(r"\.(?=\S)", " ", text)
+    # Token-leading `!` is a reference sigil (e.g. GitLab `MR !107`,
+    # `!1234`), not an exclamation. The engine would otherwise treat
+    # it as a sentence boundary and insert a pause between the sigil
+    # and the number. Strip the `!` when it sits at the head of a
+    # token (no word char before, word char after). Mid- and end-of-
+    # word `!` (`Done!`, `Wait!`) keeps its exclamation prosody.
+    text = re.sub(r"(?<!\w)!(?=\w)", "", text)
     # Runs of horizontal-bar / em-dash / box-drawing dashes are decorative
     # separators (e.g. ` Insight ―――`, `━━━━━`). The engine otherwise reads
     # them as the literal characters or as long pauses. Collapse runs of 2+
