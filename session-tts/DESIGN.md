@@ -237,6 +237,16 @@ Stripped:
 - Decorative dash runs of 2+ from `―—–─━` (e.g. ` Insight ―――`,
   `━━━ section ━━━`) — collapsed to a single space. A lone `—` / `–`
   is left alone so it can still function as prose punctuation.
+- Inline `.` between non-space chars (e.g. `say.sh`, `src/foo.tsx`,
+  `0.7.3`, `127.0.0.1`) — replaced with a single space. The engine
+  otherwise treats `.` as a sentence boundary and inserts a long
+  pause inside the filename. A sentence-ending `.` (followed by
+  whitespace or end of text) is left alone.
+- Token-leading `!` (e.g. GitLab `MR !107`, `!42`, `!Important`) —
+  stripped. The `!` there is a reference sigil, not an exclamation;
+  without this the engine treats it as a sentence boundary and
+  cleaves the number off from its prefix. Mid- and end-of-word `!`
+  (`Done!`, `Wow! Great`) keeps its exclamation prosody.
 
 Special-cased: list items keep their source paragraph (no extra `\n\n`)
 so playback flows naturally; instead each item gets a trailing `。` if
