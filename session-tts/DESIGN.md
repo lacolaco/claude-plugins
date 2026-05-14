@@ -49,7 +49,7 @@ session-tts/
     ├── tts/SKILL.md               # /session-tts:tts on/off/toggle/status
     ├── tts/tts.sh                 # /session-tts:tts skill adapter (silence + kill current playback)
     └── say/say.sh                 # adapter for the say path; not a slash command.
-                                   # Called by Claude with Bash + run_in_background=true for mid-turn narration.
+                                   # Called by Claude with the Bash tool synchronously for mid-turn narration.
 ```
 
 The plugin is structured as a single **core** (`say-response.py`)
@@ -87,7 +87,7 @@ in the background.
 | ------------------------------------ | ----------------------------------------------- | -------------------------------------------- |
 | `scripts/dispatch.sh`                | Stop / StopFailure hook stdin (JSON)            | speaks `last_assistant_message`              |
 | `scripts/notify-permission.sh`       | `Notification:permission_prompt` hook stdin     | speaks `${basename(cwd)}で承認待ちです。`    |
-| `skills/say/say.sh`                  | Bash tool argv (model-driven, `run_in_background=true`) | speaks argv[1] verbatim              |
+| `skills/say/say.sh`                  | Bash tool argv (model-driven, synchronous)      | speaks argv[1] verbatim                      |
 | `scripts/session-on.sh` (special)    | `SessionStart` hook stdin                       | speaks "TTSを開始します。" (1st run only) + injects guidance via stdout |
 | `scripts/session-end.sh`             | `SessionEnd` hook stdin                         | SIGTERMs the session's in-flight playback (does not speak) so audio doesn't outlive the session that started it |
 | `scripts/remind-say.sh todo`         | `PostToolUse:TodoWrite` hook stdin              | injects `hookSpecificOutput.additionalContext` reminder (does not speak) |
@@ -378,32 +378,32 @@ bootstrap with `{ … } & disown`; the synchronous part (voice rotation
 
 ## 10. How mid-turn narration gets invoked
 
-The model needs to be reminded to narrate progress. The calling shape
-must satisfy two properties that a plain Bash invocation of `say.sh`
-does not:
+The model is invited to narrate progress via the Claude Code **Bash
+tool**, called synchronously on `${CLAUDE_PLUGIN_ROOT}/skills/say/say.sh`.
+The call blocks for the duration of synthesis + playback, so the
+SessionStart guidance constrains narration to short phrases at real
+milestones (transition / problem / finding / pivot) — frequency
+discipline is what keeps the cumulative blocking time tolerable.
 
-1. **Non-blocking** — synthesis + playback takes seconds; without
-   backgrounding, the main turn waits for the whole bash → python →
-   afplay chain before the next tool call can fire.
-2. **Minimal context impact** — the tool call shouldn't dump SKILL.md
-   text, sub-agent transcripts, or full bash output into the main
-   conversation.
+Why a direct Bash call and not a skill / sub-agent: a `session-tts:say`
+skill injects the full SKILL.md body into context on every invocation;
+a sub-agent variant was prototyped to keep the SKILL.md / Bash output
+out of the main context, but `claude --plugin-dir` testing showed that
+sub-agent Bash sandboxes deny access to plugin cache paths — the agent
+could `Skill`-launch `session-tts:say` but had no working way to run
+the resulting Bash command. Both were ruled out by experiment.
 
-The Claude Code **Bash tool** with `run_in_background=true` satisfies
-both: the call returns immediately with a single "Command running in
-background" line and no further output until the background task is
-explicitly inspected. Implementation explorations of a `session-tts:say`
-skill (full SKILL.md gets injected into context) and a sub-agent (agent
-sandboxes can't reach the plugin cache where `say.sh` lives) were both
-ruled out by experiment.
+Earlier versions of the plugin instructed the model to pass
+`run_in_background=true` to detach synthesis + playback from the
+turn. That requirement was retired in v0.10.0 at the user's
+direction; the synchronous shape is the current contract.
 
 The required call shape:
 
 ```
 Bash(
   command: bash "${CLAUDE_PLUGIN_ROOT}/skills/say/say.sh" "<phrase>",
-  description: "TTS report",
-  run_in_background: true
+  description: "TTS report"
 )
 ```
 
@@ -418,10 +418,9 @@ to teach the model when and how to narrate.
 The injected text:
 
 - declares that TTS is enabled,
-- spells out the exact Bash + `run_in_background=true` shape (with
-  `${CLAUDE_PLUGIN_ROOT}` pre-expanded to the cached install path),
-- warns that calling Bash *without* `run_in_background=true` blocks
-  the turn,
+- spells out the exact Bash call shape (with `${CLAUDE_PLUGIN_ROOT}`
+  pre-expanded to the cached install path) and notes that the call
+  is synchronous — `run_in_background` MUST NOT be passed,
 - lists the four moments to invoke (transition / problem / finding /
   pivot),
 - requires every utterance to begin with a brief lead-in phrase (枕詞)
@@ -497,9 +496,9 @@ to plugin cache paths — the agent could `Skill`-launch `session-tts:say`
 but had no working way to actually run the resulting Bash command. The
 agent was discarded for the same v0.7.0.
 
-The current entry point is a direct **Bash tool** call with
-`run_in_background=true` on `${CLAUDE_PLUGIN_ROOT}/skills/say/say.sh`,
-made by the main Claude after seeing the SessionStart guidance. See §10.
+The current entry point is a direct synchronous **Bash tool** call on
+`${CLAUDE_PLUGIN_ROOT}/skills/say/say.sh`, made by the main Claude after
+seeing the SessionStart guidance. See §10.
 
 The underlying script `skills/say/say.sh` is unchanged and still used by
 the hook adapters.

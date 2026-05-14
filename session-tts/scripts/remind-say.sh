@@ -7,7 +7,8 @@
 # Reads the hook payload from stdin (for the session_id) and, when the
 # session has a voice and is not silenced, prints a trigger-specific
 # reminder so Claude is nudged to narrate progress via the Bash tool +
-# `${CLAUDE_PLUGIN_ROOT}/skills/say/say.sh` with run_in_background=true.
+# `${CLAUDE_PLUGIN_ROOT}/skills/say/say.sh` (synchronous; no
+# run_in_background).
 #
 # Output format depends on the hook event:
 #   - UserPromptSubmit (prompt): plain stdout — Claude Code auto-appends
@@ -34,7 +35,7 @@ cmd="bash \"$plugin_root/skills/say/say.sh\" \"<phrase>\""
 
 # Tail of every reminder — kept short and identical so the model
 # pattern-matches it as boilerplate it can compress.
-tail_common="Call Bash with run_in_background=true and command: \`$cmd\`. Open with a brief lead-in (報告です / 着手します / 完了です / 発見です / 方針転換です など), keep it under ~100 Japanese characters. run_in_background=true is REQUIRED — without it, the turn blocks for synthesis + playback. Skip if you just narrated in the immediately preceding step."
+tail_common="Call Bash (synchronous; do NOT pass run_in_background) with command: \`$cmd\`. Open with a brief lead-in (報告です / 着手します / 完了です / 発見です / 方針転換です など), keep it under ~100 Japanese characters. The call blocks until playback finishes, so report only at real milestones. Skip if you just narrated in the immediately preceding step."
 
 case "$trigger" in
   todo)

@@ -39,21 +39,18 @@ You can deliver **verbal task-progress reports during autonomous, multi-step
 work** so the user can follow your progress by ear without reading every
 message.
 
-**Always invoke via the Bash tool with \`run_in_background: true\`**:
+**Invoke via the Bash tool** (synchronous — do NOT pass \`run_in_background\`):
 
 \`\`\`
 Bash(
   command: bash "${plugin_root_for_instr}/skills/say/say.sh" "<lead-in + body, one short Japanese phrase>",
-  description: "TTS report",
-  run_in_background: true
+  description: "TTS report"
 )
 \`\`\`
 
-\`run_in_background: true\` returns immediately with just a "Command running
-in background" line — synthesis and playback proceed in a detached process
-so the next tool call is never blocked, and the audio chatter stays out of
-your main transcript. Do **not** call this without \`run_in_background\` —
-without it, the turn waits for synthesis + afplay to finish.
+The call blocks until synthesis and playback finish. Keep each phrase short
+(under ~100 Japanese characters) so the turn doesn't stall, and only narrate
+at real milestones — see the list below.
 
 Call this at these moments:
 EOF
