@@ -19,6 +19,7 @@ Blocks git subcommands that would modify the protected branch (defaults to `main
 
 - On any branch other than the protected branch: no-op (all operations allowed)
 - On the protected branch: Bash commands invoking the following git subcommands are denied — `commit`, `push`, `merge`, `rebase`, `reset`, `cherry-pick`, `revert`, `am`. All other operations (Write, Edit, `git pull`, `git status`, `git switch`, etc.) pass through unchanged.
+- Individual subcommands can be exempted from the block via `PROTECT_MAIN_BRANCH_ALLOWED_SUBCOMMANDS` (see Configuration).
 
 `git pull` is intentionally allowed so the protected branch can be synced with its upstream. To introduce changes to the protected branch, do the work on a feature branch and merge it via a PR.
 
@@ -30,7 +31,11 @@ Cannot run `git <subcommand>` on <branch> branch. Create a feature branch first.
 
 ### Configuration
 
-The protected branch name defaults to `main`. To protect a different branch or multiple branches, set the `PROTECT_MAIN_BRANCH_NAME` environment variable (space-separated list) in your Claude Code `settings.json`:
+Two environment variables can be set in your Claude Code `settings.json` (at user scope `~/.claude/settings.json`, project scope `.claude/settings.json`, or local `.claude/settings.local.json`).
+
+#### `PROTECT_MAIN_BRANCH_NAME` — protected branch names
+
+Space-separated list of branch names to protect. Defaults to `main`.
 
 ```json
 {
@@ -40,7 +45,19 @@ The protected branch name defaults to `main`. To protect a different branch or m
 }
 ```
 
-This can be set at user scope (`~/.claude/settings.json`), project scope (`.claude/settings.json`), or local (`.claude/settings.local.json`).
+#### `PROTECT_MAIN_BRANCH_ALLOWED_SUBCOMMANDS` — per-user allowlist
+
+Space-separated list of git subcommands that should be exempted from the block even when run on a protected branch. Subcommands not in the default blocklist (e.g. `pull`, `fetch`) are unaffected by this setting since they are never blocked.
+
+```json
+{
+  "env": {
+    "PROTECT_MAIN_BRANCH_ALLOWED_SUBCOMMANDS": "merge revert"
+  }
+}
+```
+
+The allowlist accepts any subcommand, including `commit` and `push` — the plugin trusts your configuration. Use this when your workflow legitimately requires running a normally-blocked subcommand on the protected branch (for example, merging a feature branch back into `main` locally).
 
 ### Installation
 
