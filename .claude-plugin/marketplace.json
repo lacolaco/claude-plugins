@@ -7,8 +7,8 @@
   "plugins": [
     {
       "name": "protect-main-branch",
-      "description": "Prevent git operations that would modify the main branch (or configured branches) in Claude Code",
-      "version": "2.0.0",
+      "description": "Prevent git operations that would modify the main branch (or configured branches) in Claude Code. Individual subcommands can be opted out via PROTECT_MAIN_BRANCH_ALLOWED_SUBCOMMANDS.",
+      "version": "2.1.0",
       "source": "./protect-main-branch"
     },
     {

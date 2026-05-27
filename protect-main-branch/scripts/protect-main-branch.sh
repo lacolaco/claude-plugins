@@ -1,8 +1,15 @@
 #!/bin/bash
 # Guard: block git operations that can modify the protected branch.
-# The protected branch names can be configured via the PROTECT_MAIN_BRANCH_NAME
-# environment variable as a space-separated list (defaults to "main").
-# Example: PROTECT_MAIN_BRANCH_NAME="main master develop"
+#
+# Configuration (environment variables):
+#   PROTECT_MAIN_BRANCH_NAME
+#     Space-separated list of protected branch names (defaults to "main").
+#     Example: PROTECT_MAIN_BRANCH_NAME="main master develop"
+#
+#   PROTECT_MAIN_BRANCH_ALLOWED_SUBCOMMANDS
+#     Space-separated list of git subcommands that should NOT be blocked even
+#     when run on a protected branch. Subcommands not in the blocklist are
+#     ignored. Example: PROTECT_MAIN_BRANCH_ALLOWED_SUBCOMMANDS="merge revert"
 
 input=$(cat)
 cwd=$(printf '%s' "$input" | jq -r '.cwd // empty')
@@ -23,7 +30,15 @@ command=$(printf '%s' "$input" | jq -r '.tool_input.command // empty')
 # branch with its upstream. Working-tree-only operations (checkout/switch/stash)
 # are also allowed.
 if [[ "$command" =~ (^|[^[:alnum:]_/-])git[[:space:]]+(commit|push|merge|rebase|reset|cherry-pick|revert|am)([[:space:]]|$) ]]; then
-  jq -n --arg branch "$branch" --arg sub "${BASH_REMATCH[2]}" '{
+  sub="${BASH_REMATCH[2]}"
+
+  # Per-user allowlist: skip the deny if this subcommand is explicitly allowed.
+  allowed_subcommands="${PROTECT_MAIN_BRANCH_ALLOWED_SUBCOMMANDS:-}"
+  case " $allowed_subcommands " in
+    *" $sub "*) exit 0 ;;
+  esac
+
+  jq -n --arg branch "$branch" --arg sub "$sub" '{
     hookSpecificOutput: {
       hookEventName: "PreToolUse",
       permissionDecision: "deny",
