@@ -7,7 +7,7 @@ Claude Code plugins by lacolaco.
 | Plugin | Description |
 |--------|-------------|
 | [protect-main-branch](./protect-main-branch) | Prevent git operations that would modify the main branch (configurable) |
-| [session-handover](./session-handover) | Session handover/takeover for task continuity between sessions |
+| [session-handover](./session-handover) | Reincarnation-style handover/takeover: each agent self-names and keeps an identity-scoped Knowledge/History document |
 | [retrospective](./retrospective) | Structured 6-stage retrospective for tasks, PRs, and incidents |
 | [session-tts](./session-tts) | Read Claude Code responses aloud locally with a different Japanese voice per session. Instructs Claude to deliver mid-turn progress narration via a synchronous Bash call into the say adapter. Permission prompts include the workspace name. ON by default; engine and voices are managed automatically (Apple Silicon) |
 
@@ -72,16 +72,34 @@ The allowlist accepts any subcommand, including `commit` and `push` — the plug
 
 ## session-handover
 
-Provides two paired skills for managing task continuity between Claude Code sessions:
+Carries work across Claude Code sessions as a **reincarnation**, not a task dump. A successor takes over a predecessor's *identity* and inherits its memory, understanding, and experience.
 
-- **`/handover`** - Creates or updates a structured handover document (`task.local.md`) at session end, capturing goals, current state, tasks, facts, hypotheses, issues, and next actions
-- **`/takeover`** - Resumes work from a handover document at session start, with a rigorous 3-phase process: read, externalize tasks, then verify and execute
+- **`/handover`** — write or update your handover document so a successor can continue as you
+- **`/takeover`** — reincarnate as a previous agent: adopt its identity and continue its work
+
+### Identity and storage
+
+Every agent has an **identity** — a common English first name it chooses for itself (`alice`, `bob`, `charlie`, …). Each identity owns one document at `.claude/handover/<name>.md` (lowercase). Because agents work in parallel, multiple identities coexist in the same workspace, each with its own document.
+
+- A new subject self-names by picking a first name not already taken in `.claude/handover/`.
+- A successor that takes over an identity keeps that name and updates the same document.
+
+These documents are **local-only working artifacts** — add `.claude/handover/` to your `.gitignore` so they are not committed.
+
+### Document schema
+
+No frontmatter. The filename is the identity. The body is two blocks:
+
+- **`## Knowledge`** (stock) — the agent's distilled, present-tense understanding, **rewritten every handover** to stay lean and current: `Goals & Non-Goals`, `Current State`, `Mental Model`, `Facts` (with evidence), `Hypotheses` (with confidence), `References` (links to external artifacts).
+- **`## History`** (flow) — the raw chronological record, **append-only, newest at the bottom**. Each entry is timestamped (`YYYY-MM-DDThh:mm`) and typed: `attempt`, `finding`, `decision`, `failure` (with a `lesson:`), `pivot`, or `handover`. A `[handover]` entry marks a reincarnation boundary.
+
+The split keeps the document lean: artifacts (commits, PRs, issues, code) are **referenced, never duplicated**; only information that exists nowhere else (hypotheses, failures, rationale, mental model) is written inline. Secrets are redacted.
 
 ### How it works
 
-When ending a session, invoke `/handover` to generate a structured Markdown document that captures the current state of work. When starting a new session, invoke `/takeover` to read that document and resume work with full context.
+**`/handover`** — if you already have an identity this session (from a takeover, or an earlier self-naming), you update your document; otherwise you self-name. The skill rewrites the `## Knowledge` block, appends what happened to `## History`, and closes with a `[handover]` entry.
 
-The takeover skill enforces a disciplined approach: it reads the handover document, externalizes all tasks using Claude Code's task tools, and only then begins verification and execution. It treats all claims from the previous session as hypotheses until verified.
+**`/takeover <name>`** takes over that identity directly; **`/takeover`** with no argument lists the documents in `.claude/handover/` and lets you choose one (by identity, with a one-line summary and last-modified time). The successor adopts the identity, reads the whole document, and inherits the predecessor's mental model — but **treats every claim as a hypothesis until it verifies it against reality**. When the document and reality diverge, it records the divergence as a `finding` in `## History`. Outstanding work is externalized to the task tool so it survives context compression.
 
 ### Installation
 
