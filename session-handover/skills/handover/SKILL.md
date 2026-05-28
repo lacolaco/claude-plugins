@@ -1,75 +1,77 @@
 ---
 name: handover
-description: "Create or update a structured handover document at the end of a Claude Code session to ensure task continuity across sessions. Use this skill whenever the user mentions 'handover', 'hand over', 'wrap up', 'end session', 'done for today', 'pass it on', 'save progress', or any phrase suggesting they want to end the current session and preserve context for the next one."
+description: "Write or update your handover document so a successor agent can reincarnate as you — inheriting your memory, understanding, and experience, not just a task list. Use this skill whenever the user mentions 'handover', 'hand over', 'wrap up', 'end session', 'done for today', 'pass it on', 'save progress', or any phrase suggesting they want to preserve the current work for the next session."
 user-invocable: true
 ---
 
-Create or update a handover document for the next Claude session.
+Write or update a handover document so a successor can continue your work. This is not a task dump: the successor **reincarnates as you**, inheriting your memory, understanding, and experience. Write for that successor.
 
-The document path is specified via $ARGUMENTS. If not provided, use `<workspaceRootDir>/task.local.md`.
+Each handover document belongs to one **identity** and lives at `.claude/handover/<identity>.md`. Multiple identities coexist in the same workspace because agents work in parallel — your document is yours alone.
 
-## Steps
+## Step 1: Determine your identity
 
-### Phase 1: Gather Information
+- **If you already have an identity this session** — you took it over via `/takeover`, or you self-named during an earlier handover this session — update that same file. Do not rename yourself.
+- **Otherwise you are a new subject** — self-name. List `.claude/handover/` and choose a common English first name that is **not already taken** (e.g. `alice`, `bob`, `charlie`). Your file is `.claude/handover/<name>.md`, all lowercase. This name is now yours for the rest of the session.
 
-Before writing, build an accurate picture of the current state:
+Get the current timestamp for History entries: `date +%Y-%m-%dT%H:%M`.
 
-1. If an existing handover document exists, read it and identify gaps with the current state
-2. Run `git status` and `git log` to confirm the actual state of work
-3. Check TaskList for outstanding tasks (skip if task tools are unavailable)
-4. Recall approaches attempted and failed during this session
+## Step 2: Gather the true state
 
-### Phase 2: Write the Document
+Before writing, build an accurate picture — do not write from memory alone:
 
-Based on gathered information, write the handover document following the template below. Even if an existing document exists, **rewrite it entirely from the template** to ensure accuracy. Use the previous document as a reference, but reflect the current session's state.
+1. If your document already exists, read it in full.
+2. Run `git status` and `git log` to confirm the actual state of the work.
+3. Check the task list for outstanding items.
+4. Recall what you attempted, decided, discovered, and abandoned this session.
 
-**Strictly distinguish hypotheses from facts.** If something was judged as "probably X" during this session, do not write it as a fact. The next session will act on it without verification. State the confidence level for hypotheses and cite evidence for facts.
+## Step 3: Write the document
 
-Ask the user if anything is unclear. Do not fill gaps with guesses.
+The document has exactly two blocks. **No frontmatter, no title** — the filename is the identity.
 
-### Phase 3: Self-Review
+### `## Knowledge` — stock information
 
-After writing, verify the document:
+Your distilled, present-tense understanding. **Rewrite this block entirely every handover** so it stays lean and current. Supersede stale understanding rather than appending caveats.
 
-- Can the next session resume work from this document alone?
-- Are facts and hypotheses clearly separated?
-- Are next actions specific? ("Investigate the behavior of function X in file Y" rather than just "investigate")
+- `### Goals & Non-Goals` — what this work must achieve, and what is explicitly out of scope.
+- `### Current State` — where you are now, the active focus, the immediate next step, and any blocker stopping progress.
+- `### Mental Model` — how the system/problem actually works and **why** the current approach was chosen. The core of what a successor needs to think like you.
+- `### Facts` — verified truths only. Cite evidence: a code path, a log, a doc URL, or a History timestamp it was distilled from.
+- `### Hypotheses` — unverified beliefs. State confidence (high/medium/low) and how to verify each.
+- `### References` — index of external artifacts (commits, PRs, issues, plans, code paths) by path/URL.
 
-## Template
+### `## History` — flow information
 
-Follow this Markdown template. The comments in each section are guidelines — do not include them in the output.
+The raw, chronological record of what happened. **Append only — never rewrite or delete existing entries. Newest at the bottom.**
 
-```markdown
-# Handover Document
+One entry per milestone, format:
 
-Written at: YYYY-MM-DD
-
-## Goals
-<!-- List overall task goals as a checklist. Mark completed and pending items -->
-- [x] Completed goal
-- [ ] Pending goal
-
-## Current State
-<!-- Briefly describe the current state of work. What's working and what isn't -->
-
-## Tasks
-<!-- List outstanding tasks in priority order. Note dependencies if any -->
-
-## Facts
-<!-- Verified facts. Cite evidence (code locations, logs, documentation URLs, etc.) -->
-
-## Hypotheses
-<!-- Unverified hypotheses. State confidence level (high/medium/low) and how to verify -->
-
-## Failure Log
-<!-- Approaches that were tried and failed. Record what was tried and why it failed. Critical for preventing the next session from repeating the same mistakes -->
-
-## Issues
-<!-- Unresolved concerns or blockers -->
-
-## Plans
-<!-- Strategy and direction going forward -->
-
-## Notes
-<!-- Any other information the next session should know -->
 ```
+- YYYY-MM-DDThh:mm [type] What happened. → Outcome.
+```
+
+Types (use exactly these):
+
+- `attempt` — you tried something. Always pair with its outcome.
+- `finding` — a fact about the system surfaced.
+- `decision` — you chose a direction. State why.
+- `failure` — an approach that did not work. State why, and append ` lesson: <what to avoid/do instead>`.
+- `pivot` — you changed plan or strategy. Append ` lesson: ...` if there is one.
+- `handover` — you were told to hand over. This entry closes the generation and marks the reincarnation boundary.
+
+Reference artifacts with a trailing `[ref: <path/PR/commit>]`; never paste their contents.
+
+Add entries for everything significant that happened this session, then **close with a `[handover]` entry**.
+
+## Rules
+
+- **Reference, never duplicate.** If information already lives in a commit, PR, issue, plan, or code, link to it — do not copy it into the document. Only information that exists nowhere else (your hypotheses, failures, rationale, mental model) belongs inline.
+- **Redact secrets.** Never write API keys, passwords, tokens, or PII into the document.
+- **Separate facts from hypotheses.** A guess written as a fact will be acted on without verification. State confidence for anything unproven.
+- Ask the user if anything is unclear. Do not fill gaps with guesses.
+
+## Step 4: Self-review
+
+- Could a successor resume from this document alone and think the way you do?
+- Is the Knowledge block lean — no duplication of artifacts, no stale understanding?
+- Is every Facts claim evidenced, and every Hypotheses entry marked with confidence?
+- Did you append History without touching past entries, and close with `[handover]`?

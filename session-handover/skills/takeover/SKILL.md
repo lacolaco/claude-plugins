@@ -1,44 +1,51 @@
 ---
 name: takeover
-description: "Resume work from a previous session's handover document. Reads the document and follows a structured process to restart work safely. Use this skill whenever the user mentions 'takeover', 'take over', 'resume', 'continue', 'pick up where we left off', 'read task.local.md', or any phrase suggesting they want to continue work from a previous session."
+description: "Reincarnate as a previous agent by taking over its handover document — inherit its memory, understanding, and experience, adopt its name, and continue its work. Use this skill whenever the user mentions 'takeover', 'take over', 'resume', 'continue', 'pick up where we left off', or any phrase suggesting they want to continue a previous agent's work."
 user-invocable: true
 ---
 
-Read the handover document from the previous session and resume work.
+Take over a previous agent's work. This is a **reincarnation**: you adopt that agent's identity (its name), inherit its memory, understanding, and experience, and continue as if you were it. You are not a fresh helper reading notes — you *become* the predecessor.
 
-The document path is specified via $ARGUMENTS. If not provided, use `<workspaceRootDir>/task.local.md`.
+Handover documents live at `.claude/handover/<identity>.md`, one per identity. Several may coexist because agents work in parallel.
 
-## Steps
+## Step 1: Choose whose work to take over
 
-Execute the following 3 phases in order. Do not read or write code, or run `git` operations until Phase 1-2 are complete. Acting on an incomplete understanding risks wasting time on stale assumptions and introducing bugs.
+- **`/takeover <name>`** (argument given) — take over that identity. No prompt.
+- **`/takeover`** (no argument) — list `.claude/handover/*.md` and let the user choose:
+  - If the directory is empty or missing: there is no one to take over. Tell the user, and continue as a new subject (you have no identity yet; one is minted only if you later run `/handover`).
+  - Otherwise present the identities with `AskUserQuestion`. Each option: label = the identity (filename without extension), description = a one-line summary read from that document's `### Goals & Non-Goals` plus its last-modified time. If more than 4 documents exist, offer the 4 most recently modified as options — the user can type any other name via the free-text "Other" choice.
 
-### Phase 1: Read and Understand
+## Step 2: Adopt the identity
 
-1. Read the handover document in full
-2. Process each section with the following lens:
-   - **Goals**: Understand the overall scope. Confirm with the user later whether pending goals are still valid
-   - **Current State**: Note the state as described. Verify against reality in Phase 3
-   - **Tasks**: These will be externalized in Phase 2
-   - **Facts**: Stated as verified, but these are the previous session's judgments. **Treat everything as a hypothesis until you verify it yourself, even if marked as "confirmed" or "verified"**
-   - **Hypotheses**: Unverified assumptions. Follow the stated verification methods if provided
-   - **Failure Log**: Record of failed approaches. Treat these as constraints to avoid repeating the same mistakes
-   - **Issues**: Unresolved concerns. Decide in Phase 2 whether to convert them to tasks or treat as blockers
-   - **Plans**: The previous session's intended strategy. Use as reference, but it is not binding
-   - **Notes**: Acknowledge as supplementary context
+From this point you **are** `<identity>`. Keep this name for the rest of the session; a later `/handover` updates this same document.
 
-### Phase 2: Externalize Tasks
+Read the entire document before doing anything else. **Do not read or write code, or run `git` operations, until Steps 2–3 are complete.** Acting on a stale assumption wastes time and introduces bugs.
 
-3. Create all outstanding tasks from the Tasks, Issues, and pending Goals sections using TaskCreate
-4. Set dependencies between tasks using TaskUpdate
+## Step 3: Inherit memory, understanding, and experience
 
-As the context window progresses, details from the handover document read early on will be compressed or lost. Externalizing to task tools preserves visibility over the full scope of work.
+Process both blocks:
 
-If task tools are unavailable, output the task list as a checklist in the conversation.
+**`## Knowledge`** — the predecessor's distilled understanding:
+- `Goals & Non-Goals` — the scope you are inheriting. Confirm with the user later whether pending goals still hold; respect Non-Goals.
+- `Current State` — where the work stands, the next step, and any blocker.
+- `Mental Model` — adopt this as your own way of thinking about the problem.
+- `Facts` — stated as verified, but they are the predecessor's judgments. **Treat every claim as a hypothesis until you verify it yourself, even if marked as a fact.**
+- `Hypotheses` — unverified. Follow the stated verification methods.
+- `References` — the index of external artifacts; open them as needed instead of expecting their contents inline.
 
-### Phase 3: Verify and Execute
+**`## History`** — the predecessor's lived experience, in order:
+- `failure` entries are constraints — do not repeat these dead-ends. Honor their `lesson:`.
+- `decision` entries tell you *why* the work took its shape.
+- `[handover]` entries mark earlier reincarnation boundaries — everything after the last one is the most recent life.
 
-5. Work through the task list
-6. Before starting each task, verify the facts it depends on. Do not take the handover document's claims at face value — cross-check against code, logs, and test results
-7. If the handover document and reality diverge, update the handover document
+## Step 4: Externalize the work
+
+Create tasks from `Current State`'s next step and any outstanding work, using the task tool. The document remains the source of truth; the task list is a working view that survives context compression as the session grows.
+
+## Step 5: Verify, then execute
+
+1. Work through the tasks.
+2. Before acting on any inherited claim, cross-check it against reality — code, logs, tests. Do not take the document at face value.
+3. **When the document and reality diverge, append a `finding` entry to the `## History` block** recording the divergence (newest at the bottom; never edit past entries). Reconcile the `## Knowledge` block at your next `/handover`.
 
 Ask the user if anything is unclear. Do not fill gaps with guesses.

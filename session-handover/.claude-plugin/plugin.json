@@ -1,7 +1,7 @@
 {
   "name": "session-handover",
-  "description": "Session handover and takeover skills for Claude Code. Manages task continuity between sessions.",
-  "version": "1.0.0",
+  "description": "Reincarnation-style handover/takeover for Claude Code. Each agent self-names with an English first name and keeps an identity-scoped document at .claude/handover/<name>.md, split into a curated Knowledge block (stock) and an append-only History block (flow). A successor takes over an identity to inherit its memory, understanding, and experience.",
+  "version": "2.0.0",
   "author": {
     "name": "Suguru Inatomi"
   },
