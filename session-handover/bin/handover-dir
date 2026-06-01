@@ -1,0 +1,41 @@
+#!/bin/bash
+# Resolve the absolute path to the workspace's .handover/ directory.
+#
+# Algorithm:
+#   1. Walk up from $PWD. At each ancestor:
+#      a. If `.handover/` exists, return its absolute path.
+#      b. Else if the v2.x `.claude/handover/` directory exists, lift it to
+#         `.handover/` at the same level (atomic rename), drop the now-empty
+#         `.claude/` if no siblings remain, then return the new path.
+#   2. If no ancestor has either, fall back to $HOME/.handover (created if
+#      missing).
+#
+# Always exits 0 with one absolute path on stdout. Skills must use this
+# output verbatim — never construct the path themselves.
+#
+# Installed under the session-handover plugin's bin/ directory, which
+# Claude Code adds to the Bash tool's PATH while the plugin is enabled.
+# Invokable as `handover-dir`.
+
+set -eu
+
+dir="$PWD"
+while [ "$dir" != "/" ]; do
+  if [ -d "$dir/.handover" ]; then
+    cd "$dir/.handover" && pwd -P
+    exit 0
+  fi
+  if [ -d "$dir/.claude/handover" ]; then
+    # v2.x → v3 auto-migration. mv within the same filesystem is atomic.
+    mv "$dir/.claude/handover" "$dir/.handover"
+    rmdir "$dir/.claude" 2>/dev/null || true
+    echo "[handover-dir] migrated v2.x handover docs: $dir/.claude/handover -> $dir/.handover" >&2
+    cd "$dir/.handover" && pwd -P
+    exit 0
+  fi
+  dir=$(dirname "$dir")
+done
+
+fallback="${HOME%/}/.handover"
+mkdir -p "$fallback"
+cd "$fallback" && pwd -P

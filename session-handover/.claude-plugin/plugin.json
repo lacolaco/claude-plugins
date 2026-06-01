@@ -1,7 +1,7 @@
 {
   "name": "session-handover",
-  "description": "Reincarnation-style handover/takeover for Claude Code. Each agent self-names with an English first name and keeps an identity-scoped document at .claude/handover/<name>.md, split into a curated Knowledge block (stock) and an append-only History block (flow). A successor takes over an identity to inherit its memory, understanding, and experience.",
-  "version": "2.0.0",
+  "description": "Reincarnation-style handover/takeover for Claude Code. Each agent self-names with an English first name and keeps an identity-scoped document at <base>/<name>.md, split into a curated Knowledge block (stock) and an append-only History block (flow). <base> is resolved deterministically by the bundled `handover-dir` command (on the Bash tool's PATH while the plugin is enabled), which walks up from cwd to the nearest .handover/ directory and falls back to $HOME/.handover when none is found. v2.x users are auto-migrated: when `handover-dir` finds a legacy `.claude/handover/` on the walk-up path, it lifts it to `.handover/` at the same level on first use — no manual step needed. A successor takes over an identity to inherit its memory, understanding, and experience.",
+  "version": "3.0.0",
   "author": {
     "name": "Suguru Inatomi"
   },

@@ -79,12 +79,27 @@ Carries work across Claude Code sessions as a **reincarnation**, not a task dump
 
 ### Identity and storage
 
-Every agent has an **identity** — a common English first name it chooses for itself (`alice`, `bob`, `charlie`, …). Each identity owns one document at `.claude/handover/<name>.md` (lowercase). Because agents work in parallel, multiple identities coexist in the same workspace, each with its own document.
+Every agent has an **identity** — a common English first name it chooses for itself (`alice`, `bob`, `charlie`, …). Each identity owns one document at `<base>/<name>.md` (lowercase). Because agents work in parallel, multiple identities coexist in the same workspace, each with its own document.
 
-- A new subject self-names by picking a first name not already taken in `.claude/handover/`.
+- A new subject self-names by picking a first name not already taken in `<base>/`.
 - A successor that takes over an identity keeps that name and updates the same document.
 
-These documents are **local-only working artifacts** — add `.claude/handover/` to your `.gitignore` so they are not committed.
+`<base>` is resolved **deterministically** the moment either skill fires by the `handover-dir` command (shipped in the plugin's `bin/`, which Claude Code adds to the Bash tool's `PATH` while the plugin is enabled):
+
+1. Walk up from `$PWD`. At each ancestor:
+   1. If `.handover/` exists, return its absolute path.
+   2. Else if a legacy v2.x `.claude/handover/` exists, lift it to `.handover/` at the same level (atomic rename), drop the now-empty `.claude/` if no siblings remain, then return the new path.
+2. If no ancestor has either, fall back to `$HOME/.handover` (created if missing).
+
+The agent never constructs `<base>` from `cwd` itself — it runs `handover-dir` and uses its stdout verbatim. This guarantees that a session started from a subdirectory of a workspace lands in the workspace's `.handover/`, not in the subdirectory. The resolution runs only when `/handover` or `/takeover` is invoked — sessions that never use either skill incur no overhead.
+
+### Upgrading from v2.x
+
+v2.x stored documents at `.claude/handover/<name>.md`. v3 moves them to `.handover/<name>.md` and adds the deterministic walk-up resolution. **The migration runs automatically on first invocation of `/handover` or `/takeover` after upgrade** — `handover-dir` lifts the legacy directory in place. No manual `mv` is required.
+
+To pin handovers to a particular workspace root, create `.handover/` there once (`mkdir <root>/.handover`); from then on every session under that root resolves to it.
+
+These documents are **local-only working artifacts** — add `.handover/` to your `.gitignore` (or your global gitignore) so they are not committed.
 
 ### Document schema
 
@@ -99,7 +114,7 @@ The split keeps the document lean: artifacts (commits, PRs, issues, code) are **
 
 **`/handover`** — if you already have an identity this session (from a takeover, or an earlier self-naming), you update your document; otherwise you self-name. The skill rewrites the `## Knowledge` block, appends what happened to `## History`, and closes with a `[handover]` entry.
 
-**`/takeover <name>`** takes over that identity directly; **`/takeover`** with no argument lists the documents in `.claude/handover/` and lets you choose one (by identity, with a one-line summary and last-modified time). The successor adopts the identity, reads the whole document, and inherits the predecessor's mental model — but **treats every claim as a hypothesis until it verifies it against reality**. When the document and reality diverge, it records the divergence as a `finding` in `## History`. Outstanding work is externalized to the task tool so it survives context compression.
+**`/takeover <name>`** takes over that identity directly; **`/takeover`** with no argument lists the documents in `<base>/` and lets you choose one (by identity, with a one-line summary and last-modified time). The successor adopts the identity, reads the whole document, and inherits the predecessor's mental model — but **treats every claim as a hypothesis until it verifies it against reality**. When the document and reality diverge, it records the divergence as a `finding` in `## History`. Outstanding work is externalized to the task tool so it survives context compression.
 
 ### Installation
 

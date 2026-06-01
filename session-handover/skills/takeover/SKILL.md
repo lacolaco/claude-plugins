@@ -2,17 +2,24 @@
 name: takeover
 description: "Reincarnate as a previous agent by taking over its handover document — inherit its memory, understanding, and experience, adopt its name, and continue its work. Use this skill whenever the user mentions 'takeover', 'take over', 'resume', 'continue', 'pick up where we left off', or any phrase suggesting they want to continue a previous agent's work."
 user-invocable: true
+allowed-tools: Bash(handover-dir)
 ---
 
 Take over a previous agent's work. This is a **reincarnation**: you adopt that agent's identity (its name), inherit its memory, understanding, and experience, and continue as if you were it. You are not a fresh helper reading notes — you *become* the predecessor.
 
-Handover documents live at `.claude/handover/<identity>.md`, one per identity. Several may coexist because agents work in parallel.
+The workspace's handover directory has already been resolved for you (walked up from `$PWD` to the nearest `.handover/`, or fallen back to `$HOME/.handover`):
+
+```
+<base> = !`handover-dir`
+```
+
+Handover documents live at `<base>/<identity>.md`, one per identity. Several may coexist because agents work in parallel. Use the absolute `<base>` above verbatim for every list/read below — **never construct the path from `cwd` yourself**.
 
 ## Step 1: Choose whose work to take over
 
 - **`/takeover <name>`** (argument given) — take over that identity. No prompt.
-- **`/takeover`** (no argument) — list `.claude/handover/*.md` and let the user choose:
-  - If the directory is empty or missing: there is no one to take over. Tell the user, and continue as a new subject (you have no identity yet; one is minted only if you later run `/handover`).
+- **`/takeover`** (no argument) — list `<base>/*.md` and let the user choose:
+  - If the directory is empty: there is no one to take over. Tell the user, and continue as a new subject (you have no identity yet; one is minted only if you later run `/handover`).
   - Otherwise present the identities with `AskUserQuestion`. Each option: label = the identity (filename without extension), description = a one-line summary read from that document's `### Goals & Non-Goals` plus its last-modified time. If more than 4 documents exist, offer the 4 most recently modified as options — the user can type any other name via the free-text "Other" choice.
 
 ## Step 2: Adopt the identity
