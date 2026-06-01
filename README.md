@@ -9,7 +9,7 @@ Claude Code plugins by lacolaco.
 | [protect-main-branch](./protect-main-branch) | Prevent git operations that would modify the main branch (configurable) |
 | [session-handover](./session-handover) | Reincarnation-style handover/takeover: each agent self-names and keeps an identity-scoped Knowledge/History document |
 | [retrospective](./retrospective) | Structured 6-stage retrospective for tasks, PRs, and incidents |
-| [session-tts](./session-tts) | Read Claude Code responses aloud locally with a different Japanese voice per session. Instructs Claude to deliver mid-turn progress narration via a synchronous Bash call into the say adapter. Permission prompts include the workspace name. ON by default; engine and voices are managed automatically (Apple Silicon) |
+| [session-tts](./session-tts) | Read Claude Code responses aloud locally with a different Japanese voice per session. Instructs Claude to deliver mid-turn progress narration via a synchronous Bash call into the say adapter. Permission prompts include the workspace name. ON by default; playback volume is adjustable via `/session-tts:volume`. Engine and voices are managed automatically (Apple Silicon) |
 
 ## protect-main-branch
 
@@ -224,6 +224,18 @@ Voice is ON by default in every new session. Use the `/session-tts:tts` skill to
 ```
 
 The skill toggles `~/.claude/session-tts/silenced/$CLAUDE_CODE_SESSION_ID` and is independent of the voice assignment, so silencing then re-enabling preserves the same voice. Switching to `off` additionally kills any utterance still playing for this session (via the per-session playback pidfile), so the silence takes effect immediately rather than draining the remaining chunk queue. Other concurrent sessions are unaffected. The same flag is honored by `say.sh` (used by both the mid-turn narration call described above and the Stop / Notification hook adapters), so silenced sessions stay silent across every entry point.
+
+### Adjust playback volume: `/session-tts:volume`
+
+Every chunk is played through `afplay --volume <coefficient>`. The default coefficient is `0.8`, which keeps TTS quieter than other audio (notifications, music) when system volume is up — macOS has no native way to make `afplay` follow the system "alert volume", so this is the simplest substitute. Use the `/session-tts:volume` skill to override:
+
+```
+/session-tts:volume 0.5      # set the coefficient to 0.5
+/session-tts:volume status   # show the current value (default)
+/session-tts:volume reset    # restore the built-in default (0.8)
+```
+
+The chosen value is persisted to `~/.claude/session-tts/volume` and read by `say-response.py` for every chunk it plays. The setting is **per-user**, not per-session — adjusting it affects every active and future session, including ones already running (the next chunk picks up the new value). Values outside `[0.0, 1.0]` are rejected and the previous setting (or the built-in default) stays in effect.
 
 ### Installation
 
