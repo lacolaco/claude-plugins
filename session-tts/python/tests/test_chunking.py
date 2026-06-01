@@ -85,6 +85,54 @@ class TestSplitIntoChunks:
             assert len(c) <= say_response.LATER_CHUNK_MAX
 
 
+class TestCommaIsNotASplitBoundary:
+    """Regression: `、，,` must not act as chunk boundaries.
+
+    Each chunk adds `prePhonemeLength = 0.5` of leading silence and a separate
+    `afplay` device-open transient, so splitting at commas inserts unintended
+    half-second pauses inside what the engine would otherwise read as a single
+    prosodic phrase. The engine handles its own micro-pause at commas.
+    """
+
+    def test_single_sentence_with_commas_stays_one_chunk(self, say_response):
+        text = "あれもこれも、それも、どれもが、まとめて一文に収まっている。"
+        chunks = say_response.split_into_chunks(text)
+        assert chunks == [text]
+
+    def test_long_sentence_with_many_commas_under_first_chunk_max(self, say_response):
+        # All under FIRST_CHUNK_MAX → single chunk despite multiple commas.
+        text = "報告です、A です、B です、C です。"
+        chunks = say_response.split_into_chunks(text)
+        assert len(chunks) == 1
+        assert "、" in chunks[0]
+
+    def test_period_still_splits(self, say_response):
+        # Two sentences each exceeding FIRST_CHUNK_MAX → must split at `。`.
+        s1 = "これはひとつ目の文章で、ある程度の長さを持ち、読点を含みます。"
+        s2 = "これはふたつ目の文章で、こちらもある程度の長さを持ち、読点を含みます。"
+        chunks = say_response.split_into_chunks(s1 + s2)
+        assert len(chunks) >= 2
+        # First chunk ends at the first period (no further split inside it).
+        assert chunks[0].endswith("。")
+        assert "、" in chunks[0]
+
+    def test_ascii_period_still_splits(self, say_response):
+        # ASCII sentence-ending `.` (followed by space) must still act as a
+        # boundary so English prose isn't crammed into one chunk.
+        text = (
+            "First sentence runs long enough to push past the first-chunk "
+            "budget. Second sentence follows, also long enough to matter."
+        )
+        chunks = say_response.split_into_chunks(text)
+        assert len(chunks) >= 2
+
+    def test_ascii_comma_not_a_boundary(self, say_response):
+        text = "alpha, beta, gamma, delta all on one line."
+        chunks = say_response.split_into_chunks(text)
+        # No splitting on `,` even though the sentence has several.
+        assert len(chunks) == 1
+
+
 class TestIntegratedPipeline:
     """End-to-end through clean() + split_into_chunks() on real-world input."""
 
