@@ -253,7 +253,14 @@ def _force_split(text: str, max_chars: int) -> list[str]:
 
 
 def _split_paragraph(text: str, max_chars: int) -> list[str]:
-    parts = re.split(r"(?<=[。．！？!?、，,])\s*", text)
+    # Boundary set is sentence-terminal punctuation only — `、，,` are
+    # intentionally excluded. Each chunk gets a `prePhonemeLength = 0.5`
+    # pad and a separate `afplay` device-open transient, which together
+    # turn every chunk boundary into ~0.5+ s of unintended silence. Using
+    # commas as boundaries therefore inserts a long pause inside what the
+    # engine would otherwise read as a single prosodic phrase. Leaving
+    # commas in-chunk lets the engine produce its own natural micro-pause.
+    parts = re.split(r"(?<=[。．！？!?.])\s*", text)
     chunks: list[str] = []
     current = ""
     for part in parts:
@@ -278,7 +285,7 @@ def _split_paragraph(text: str, max_chars: int) -> list[str]:
 
 
 def split_into_chunks(text: str) -> list[str]:
-    """Split on paragraphs first, then sentence/clause boundaries.
+    """Split on paragraphs first, then sentence-terminal boundaries.
 
     The first chunk is capped at FIRST_CHUNK_MAX so the engine returns
     something playable as fast as possible; subsequent chunks use

@@ -70,7 +70,7 @@ adapter (hook stdin / skill arg)
   → say-response.py (stdin = text, env = speaker)
       ├── kill_previous_playback (preempt)
       ├── clean()              # strip markdown
-      ├── split_into_chunks()  # paragraph → sentence/clause
+      ├── split_into_chunks()  # paragraph → sentence (commas not used)
       ├── synth_worker  ──┐
       │                    ├── play_queue (FIFO)
       └── player_worker ──┘    (afplay each WAV in order)
@@ -293,8 +293,14 @@ that is truncated.
 Two-level split:
 
 1. Paragraphs (split on `\n\n`+).
-2. Inside each paragraph, sentence/clause boundaries
-   (`。．！？!?、，,`).
+2. Inside each paragraph, **sentence-terminal** boundaries only:
+   `。．！？!?` and ASCII `.`. Commas (`、，,`) are deliberately
+   **not** boundaries. Every chunk gets a `prePhonemeLength = 0.5`
+   lead-in pad and a separate `afplay` device-open transient, so
+   each boundary adds ~0.5+ s of unintended silence. Splitting at
+   commas would turn what the engine reads as one prosodic phrase
+   into multiple chunks separated by long pauses; leaving commas
+   in-chunk lets the engine produce its own natural micro-pause.
 
 Bounds:
 
