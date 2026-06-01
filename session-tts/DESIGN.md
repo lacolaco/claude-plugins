@@ -48,6 +48,8 @@ session-tts/
 └── skills/
     ├── tts/SKILL.md               # /session-tts:tts on/off/toggle/status
     ├── tts/tts.sh                 # /session-tts:tts skill adapter (silence + kill current playback)
+    ├── volume/SKILL.md            # /session-tts:volume <0.0-1.0>|status|reset
+    ├── volume/volume.sh           # /session-tts:volume skill adapter (writes ~/.claude/session-tts/volume)
     └── say/say.sh                 # adapter for the say path; not a slash command.
                                    # Called by Claude with the Bash tool synchronously for mid-turn narration.
 ```
@@ -146,6 +148,7 @@ voice models.
 │   └── <session_id>              # contents = assigned speaker_id (style_id)
 ├── silenced/
 │   └── <session_id>              # presence file → /session-tts:tts off
+├── volume                        # user-wide afplay --volume coefficient (0.0..1.0); absent or invalid → default 0.8
 └── playback/
     └── <session_id>              # current playback's process group id, per session
 ```
@@ -165,6 +168,13 @@ Invariants:
   Stale entries are harmless because `kill_previous_playback`
   swallows both `ProcessLookupError` and `PermissionError` from
   `os.killpg`.
+- `volume` holds the `afplay --volume` coefficient and is read by
+  `say-response.py::resolve_playback_volume()` **per chunk** (not
+  once per process), so an adjustment via `/session-tts:volume`
+  applies to the next chunk of any in-flight utterance. The file is
+  user-wide (one entry, no `<session_id>` subdirectory) — concurrent
+  sessions share one volume. Absent / unreadable / out-of-range
+  contents fall back to the built-in default (0.8).
 
 ## 5. Voice assignment
 
@@ -320,6 +330,26 @@ Multi-paragraph answers get sped up so they don't drag.
 - Failed `/synthesis` calls are skipped (not aborted): better to lose
   one sentence than to leave the user wondering why nothing is being
   read.
+
+### 7.4 Playback volume
+
+Every chunk is played via `afplay --volume <coefficient>`. The
+coefficient is resolved per chunk in `player_worker` via
+`resolve_playback_volume()`:
+
+1. Read `~/.claude/session-tts/volume`.
+2. Parse as float; reject anything outside `[0.0, 1.0]`.
+3. Fall back to `DEFAULT_PLAYBACK_VOLUME = 0.8` on any failure
+   (missing file, parse error, out-of-range).
+
+The default is below 1.0 because macOS has no native way to make
+`afplay` follow the system "alert volume" — without the cap, TTS
+would dominate over notifications and music when system volume is
+up. Per-user override is provided by the `/session-tts:volume`
+skill (`skills/volume/volume.sh`), which validates the value and
+writes it to the same file. The file is read per chunk rather than
+once per `say-response.py` process so an in-flight utterance picks
+up a volume change starting with its next chunk.
 
 ## 8. Single-flight playback (per session)
 

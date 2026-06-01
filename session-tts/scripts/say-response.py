@@ -52,11 +52,27 @@ FAST_SPEED_SCALE = 1.2
 MAX_CHUNKS = 8
 TRUNCATION_NOTICE = "以下、省略します。"
 
-# afplay --volume coefficient applied to every chunk. Capped below 1.0 so
-# TTS doesn't dominate over other audio (notifications, music) when the
-# user has system volume up. macOS has no native way to make afplay
-# follow the system "alert volume"; this is the simplest substitute.
-PLAYBACK_VOLUME = "0.8"
+# afplay --volume coefficient applied to every chunk. The default is capped
+# below 1.0 so TTS doesn't dominate over other audio (notifications, music)
+# when the user has system volume up. macOS has no native way to make afplay
+# follow the system "alert volume"; this is the simplest substitute. The
+# user can override via the /session-tts:volume skill, which writes the
+# chosen value to VOLUME_FILE; any value outside [0.0, 1.0] or an unreadable
+# file falls back to the default.
+DEFAULT_PLAYBACK_VOLUME = 0.8
+VOLUME_FILE = os.path.expanduser("~/.claude/session-tts/volume")
+
+
+def resolve_playback_volume() -> str:
+    try:
+        with open(VOLUME_FILE) as f:
+            raw = f.read().strip()
+        value = float(raw)
+    except (FileNotFoundError, ValueError, OSError):
+        return f"{DEFAULT_PLAYBACK_VOLUME:.2f}"
+    if not 0.0 <= value <= 1.0:
+        return f"{DEFAULT_PLAYBACK_VOLUME:.2f}"
+    return f"{value:.2f}"
 
 # Per-session pidfile. Holds the process-group id of the most recent
 # in-flight playback for this session. A new utterance reads the file,
@@ -361,7 +377,9 @@ def player_worker(play_queue: "queue.Queue[str | None]") -> None:
         path = play_queue.get()
         if path is None:
             return
-        subprocess.run(["afplay", "--volume", PLAYBACK_VOLUME, path], check=False)
+        subprocess.run(
+            ["afplay", "--volume", resolve_playback_volume(), path], check=False
+        )
         try:
             os.unlink(path)
         except FileNotFoundError:
