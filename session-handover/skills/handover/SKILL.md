@@ -2,16 +2,23 @@
 name: handover
 description: "Write or update your handover document so a successor agent can reincarnate as you — inheriting your memory, understanding, and experience, not just a task list. Use this skill whenever the user mentions 'handover', 'hand over', 'wrap up', 'end session', 'done for today', 'pass it on', 'save progress', or any phrase suggesting they want to preserve the current work for the next session."
 user-invocable: true
+allowed-tools: Bash(handover-dir)
 ---
 
 Write or update a handover document so a successor can continue your work. This is not a task dump: the successor **reincarnates as you**, inheriting your memory, understanding, and experience. Write for that successor.
 
-Each handover document belongs to one **identity** and lives at `.claude/handover/<identity>.md`. Multiple identities coexist in the same workspace because agents work in parallel — your document is yours alone.
+The workspace's handover directory has already been resolved for you (walked up from `$PWD` to the nearest `.handover/`, or fallen back to `$HOME/.handover`):
+
+```
+<base> = !`handover-dir`
+```
+
+Each handover document belongs to one **identity** and lives at `<base>/<identity>.md`. Multiple identities coexist in the same workspace because agents work in parallel — your document is yours alone. Use the absolute `<base>` above verbatim for every read/list/write below — **never construct the path from `cwd` yourself**.
 
 ## Step 1: Determine your identity
 
 - **If you already have an identity this session** — you took it over via `/takeover`, or you self-named during an earlier handover this session — update that same file. Do not rename yourself.
-- **Otherwise you are a new subject** — self-name. List `.claude/handover/` and choose a common English first name that is **not already taken** (e.g. `alice`, `bob`, `charlie`). Your file is `.claude/handover/<name>.md`, all lowercase. This name is now yours for the rest of the session.
+- **Otherwise you are a new subject** — self-name. List `<base>/` and choose a common English first name that is **not already taken** (e.g. `alice`, `bob`, `charlie`). Your file is `<base>/<name>.md`, all lowercase. This name is now yours for the rest of the session.
 
 Get the current timestamp for History entries: `date +%Y-%m-%dT%H:%M`.
 
