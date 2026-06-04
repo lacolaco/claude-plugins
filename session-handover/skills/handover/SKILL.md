@@ -33,7 +33,22 @@ Before writing, build an accurate picture — do not write from memory alone:
 
 ## Step 3: Write the document
 
-The document has exactly two blocks. **No frontmatter, no title** — the filename is the identity.
+The document is one YAML frontmatter block followed by exactly two body blocks. **No title** — the filename is the identity.
+
+### Frontmatter — your job description
+
+```
+---
+description: <one-line job description>
+---
+```
+
+- `description` is the **job description** of this identity: a stable, one-line statement of the work this worker exists to do (e.g. `Migrate the auth flow from Firebase to Auth0`, `Maintain the .knowledge/ KB ingestion pipeline`). Treat it the way a hiring document treats a role description — it identifies the job, not the current status.
+- It is **stable**. Do not rewrite it at every handover to reflect progress, blockers, or the next step — those belong in `### Current State`. Only revise `description` when the role itself shifts (scope change, pivot to a different problem).
+- One line, no line breaks. Keep it short enough to scan in a list (≤ ~80 chars is a good target). Plain text only — no markdown, no quotes.
+- If you are a **new subject**, write the `description` the first time you create the document. If you are continuing an existing identity, **copy the existing `description:` line byte-for-byte from the prior document on disk** into the new write. Do not re-type it from memory, do not paraphrase it, do not "improve" the wording. The only situations that justify a new `description` value are (a) you are minting a new identity, or (b) the user has explicitly told you the role has shifted (scope change, pivot to a different problem). Drift in either case must be a deliberate, traceable decision — never a silent edit.
+
+The successor's `/takeover` uses this field to pick a document without reading its body, so an accurate `description` is what makes lightweight selection possible.
 
 ### `## Knowledge` — stock information
 
@@ -78,6 +93,7 @@ Add entries for everything significant that happened this session, then **close 
 
 ## Step 4: Self-review
 
+- Does the frontmatter `description` still accurately name this job? (If the role hasn't shifted, the old value should stand.)
 - Could a successor resume from this document alone and think the way you do?
 - Is the Knowledge block lean — no duplication of artifacts, no stale understanding?
 - Is every Facts claim evidenced, and every Hypotheses entry marked with confidence?

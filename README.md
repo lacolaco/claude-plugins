@@ -103,8 +103,9 @@ These documents are **local-only working artifacts** — add `.handover/` to you
 
 ### Document schema
 
-No frontmatter. The filename is the identity. The body is two blocks:
+The filename is the identity. The body is one YAML frontmatter block followed by two body blocks:
 
+- **Frontmatter** — a single field, `description`, holding the worker's **job description**: a stable, one-line statement of the work this identity exists to do (e.g. `Migrate the auth flow from Firebase to Auth0`). It is set once when a new subject is minted and only revised when the role itself shifts — not at every handover. `/takeover` uses this field to list candidates without reading the body.
 - **`## Knowledge`** (stock) — the agent's distilled, present-tense understanding, **rewritten every handover** to stay lean and current: `Goals & Non-Goals`, `Current State`, `Mental Model`, `Facts` (with evidence), `Hypotheses` (with confidence), `References` (links to external artifacts).
 - **`## History`** (flow) — the raw chronological record, **append-only, newest at the bottom**. Each entry is timestamped (`YYYY-MM-DDThh:mm`) and typed: `attempt`, `finding`, `decision`, `failure` (with a `lesson:`), `pivot`, or `handover`. A `[handover]` entry marks a reincarnation boundary.
 
@@ -112,9 +113,13 @@ The split keeps the document lean: artifacts (commits, PRs, issues, code) are **
 
 ### How it works
 
-**`/handover`** — if you already have an identity this session (from a takeover, or an earlier self-naming), you update your document; otherwise you self-name. The skill rewrites the `## Knowledge` block, appends what happened to `## History`, and closes with a `[handover]` entry.
+**`/handover`** — if you already have an identity this session (from a takeover, or an earlier self-naming), you update your document; otherwise you self-name. The skill writes the frontmatter `description` on first creation (and leaves it alone afterwards unless the role has shifted), rewrites the `## Knowledge` block, appends what happened to `## History`, and closes with a `[handover]` entry.
 
-**`/takeover <name>`** takes over that identity directly; **`/takeover`** with no argument lists the documents in `<base>/` and lets you choose one (by identity, with a one-line summary and last-modified time). The successor adopts the identity, reads the whole document, and inherits the predecessor's mental model — but **treats every claim as a hypothesis until it verifies it against reality**. When the document and reality diverge, it records the divergence as a `finding` in `## History`. Outstanding work is externalized to the task tool so it survives context compression.
+**`/takeover <name>`** takes over that identity directly; **`/takeover`** with no argument lists the documents in `<base>/` and lets you choose one (by identity, with the frontmatter `description` and last-modified time — the body is not read until selection). The successor adopts the identity, reads the whole document, and inherits the predecessor's mental model — but **treats every claim as a hypothesis until it verifies it against reality**. When the document and reality diverge, it records the divergence as a `finding` in `## History`. Outstanding work is externalized to the task tool so it survives context compression.
+
+### Upgrading from v3.0.x
+
+v3.0.x documents had no frontmatter. v3.1.0 adds the `description` field but is **backwards-compatible**: existing documents without frontmatter remain valid and selectable in `/takeover` (the description column renders as `(no description)`). The next time their owner runs `/handover`, the frontmatter is written for them. No manual migration is required.
 
 ### Installation
 
