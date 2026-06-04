@@ -20,7 +20,10 @@ Handover documents live at `<base>/<identity>.md`, one per identity. Several may
 - **`/takeover <name>`** (argument given) — take over that identity. No prompt.
 - **`/takeover`** (no argument) — list `<base>/*.md` and let the user choose:
   - If the directory is empty: there is no one to take over. Tell the user, and continue as a new subject (you have no identity yet; one is minted only if you later run `/handover`).
-  - Otherwise present the identities with `AskUserQuestion`. Each option: label = the identity (filename without extension), description = a one-line summary read from that document's `### Goals & Non-Goals` plus its last-modified time. If more than 4 documents exist, offer the 4 most recently modified as options — the user can type any other name via the free-text "Other" choice.
+  - Otherwise present the identities with `AskUserQuestion`. Each option:
+    - **label** = the identity (filename without extension).
+    - **description** = the value of the document's frontmatter `description` field — the worker's job description — plus its last-modified time. Read **only the frontmatter**, not the body. Extract it with e.g. `awk '/^---$/{c++; next} c==1' <base>/<name>.md | grep -E '^description:' | sed 's/^description: *//'`. If the document has no frontmatter (legacy v3.0.x format), show `(no description)` for that option and keep it selectable — the body is read in full at Step 2 either way.
+  - If more than 4 documents exist, offer the 4 most recently modified as options — the user can type any other name via the free-text "Other" choice.
 
 ## Step 2: Adopt the identity
 
@@ -30,7 +33,9 @@ Read the entire document before doing anything else. **Do not read or write code
 
 ## Step 3: Inherit memory, understanding, and experience
 
-Process both blocks:
+Process the frontmatter and both body blocks:
+
+**Frontmatter `description`** — the job description you are inheriting. It names the work this identity exists to do; treat it as your own job from here. Do not rewrite it unless the role itself shifts (see the `handover` skill for the rule).
 
 **`## Knowledge`** — the predecessor's distilled understanding:
 - `Goals & Non-Goals` — the scope you are inheriting. Confirm with the user later whether pending goals still hold; respect Non-Goals.
