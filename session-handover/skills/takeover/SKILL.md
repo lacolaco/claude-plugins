@@ -22,7 +22,13 @@ Handover documents live at `<base>/<identity>.md`, one per identity. Several may
   - If the directory is empty: there is no one to take over. Tell the user, and continue as a new subject (you have no identity yet; one is minted only if you later run `/handover`).
   - Otherwise present the identities with `AskUserQuestion`. Each option:
     - **label** = the identity (filename without extension).
-    - **description** = the value of the document's frontmatter `description` field — the worker's job description — plus its last-modified time. Read **only the frontmatter**, not the body. Extract it with e.g. `awk '/^---$/{c++; next} c==1' <base>/<name>.md | grep -E '^description:' | sed 's/^description: *//'`. If the document has no frontmatter (legacy v3.0.x format), show `(no description)` for that option and keep it selectable — the body is read in full at Step 2 either way.
+    - **description** = the value of the document's frontmatter `description` field — the worker's job description — plus its last-modified time. Read **only the frontmatter**, not the body. A document has frontmatter iff its **first line is exactly `---`**; otherwise treat it as legacy v3.0.x and show `(no description)`. When frontmatter is present, extract the value with:
+
+      ```
+      awk 'NR==1 && $0!="---"{exit} /^---$/{c++; if(c==2) exit; next} c==1 && /^description:[[:space:]]*/{sub(/^description:[[:space:]]*/, ""); print; exit}' <base>/<name>.md
+      ```
+
+      If the snippet emits nothing (no frontmatter, or frontmatter without a `description:` key), show `(no description)` and keep the option selectable — the body is read in full at Step 2 either way.
   - If more than 4 documents exist, offer the 4 most recently modified as options — the user can type any other name via the free-text "Other" choice.
 
 ## Step 2: Adopt the identity
