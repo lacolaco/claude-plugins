@@ -20,6 +20,7 @@ Blocks git subcommands that would modify the protected branch (defaults to `main
 - On any branch other than the protected branch: no-op (all operations allowed)
 - On the protected branch: Bash commands invoking the following git subcommands are denied — `commit`, `push`, `merge`, `rebase`, `reset`, `cherry-pick`, `revert`, `am`. All other operations (Write, Edit, `git pull`, `git status`, `git switch`, etc.) pass through unchanged.
 - Individual subcommands can be exempted from the block via `PROTECT_MAIN_BRANCH_ALLOWED_SUBCOMMANDS` (see Configuration).
+- The whole hook can be turned off for the current scope via `PROTECT_MAIN_BRANCH_DISABLE=1` (see Configuration). Useful for solo-author repos with linear-history-on-main policies where the protection is the wrong default.
 
 `git pull` is intentionally allowed so the protected branch can be synced with its upstream. To introduce changes to the protected branch, do the work on a feature branch and merge it via a PR.
 
@@ -31,7 +32,21 @@ Cannot run `git <subcommand>` on <branch> branch. Create a feature branch first.
 
 ### Configuration
 
-Two environment variables can be set in your Claude Code `settings.json` (at user scope `~/.claude/settings.json`, project scope `.claude/settings.json`, or local `.claude/settings.local.json`).
+Three environment variables can be set in your Claude Code `settings.json` (at user scope `~/.claude/settings.json`, project scope `.claude/settings.json`, or local `.claude/settings.local.json`). Settings are loaded at session start, so a new session must be opened for changes to take effect.
+
+#### `PROTECT_MAIN_BRANCH_DISABLE` — turn the hook off entirely
+
+When set to `"1"`, the hook exits 0 unconditionally and allows every git operation on every branch, including the protected one. The other two variables are not consulted. Defaults to unset (hook active).
+
+```json
+{
+  "env": {
+    "PROTECT_MAIN_BRANCH_DISABLE": "1"
+  }
+}
+```
+
+Place this in `.claude/settings.local.json` of a specific repository to opt that repository out of protection while keeping the hook active everywhere else. Any value other than `"1"` (including `"0"`, `"true"`, empty string) keeps the hook active — the check is strictly `= "1"` so the kill switch can only be tripped intentionally.
 
 #### `PROTECT_MAIN_BRANCH_NAME` — protected branch names
 

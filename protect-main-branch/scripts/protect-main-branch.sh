@@ -2,6 +2,11 @@
 # Guard: block git operations that can modify the protected branch.
 #
 # Configuration (environment variables):
+#   PROTECT_MAIN_BRANCH_DISABLE
+#     When set to "1", the hook unconditionally exits 0 and lets every git
+#     operation through. Intended for repositories where the user opts out of
+#     main-branch protection entirely. Wins over the other two variables.
+#
 #   PROTECT_MAIN_BRANCH_NAME
 #     Space-separated list of protected branch names (defaults to "main").
 #     Example: PROTECT_MAIN_BRANCH_NAME="main master develop"
@@ -12,6 +17,14 @@
 #     ignored. Example: PROTECT_MAIN_BRANCH_ALLOWED_SUBCOMMANDS="merge revert"
 
 input=$(cat)
+
+# Per-scope kill switch: when set to "1", let every operation through.
+# Read before any other logic so a disabled scope spends as little work as
+# possible parsing input or shelling out to git.
+if [ "${PROTECT_MAIN_BRANCH_DISABLE:-}" = "1" ]; then
+  exit 0
+fi
+
 cwd=$(printf '%s' "$input" | jq -r '.cwd // empty')
 [ -z "$cwd" ] && cwd=$(pwd)
 
