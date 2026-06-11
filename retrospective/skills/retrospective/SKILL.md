@@ -14,6 +14,21 @@ An agent's task execution proceeds through 6 stages:
 
 A retrospective lifts **Problems bottom-up** from downstream to upstream, and applies **Tries top-down** from upstream to downstream. **A hole plugged upstream is not plugged again downstream.** Layered defenses are added only when upstream countermeasures are low-confidence.
 
+## On the limits of self-report
+
+This skill is run by the same agent that produced the session being retrospected. Same-context self-reflection is documented to fail via "degeneration of thought" (Reflexion, Multi-Agent Reflexion): the reflecting model reinforces its original bias rather than finding a new angle.
+
+The skill therefore bundles fresh-context critic agents at every step where the main agent's bias would otherwise control the outcome:
+
+- Phase 2 Opportunity surfacing: `opportunity-finder` (refutes "no opportunities")
+- Phase 3 Keep extraction: `keep-extractor` (refutes case-specific or industry-baseline Keeps)
+- Phase 5 Step 5.5 search log: `search-log-critic` (refutes "no existing rule covers this")
+- Submission curator audit: `curator` (refutes "library is healthy")
+
+Even with these critics, this skill cannot fully break the agent's self-report — the agent still chooses what to pass to each critic, and counters in the Submission are agent-reported. The critics shift the probability away from append-only failure modes; they do not eliminate it. Acknowledge this limit when reviewing the Submission: a low-bloat report is not proof the retrospective was thorough, only that no critic caught the agent.
+
+All four critics are configured with `model: sonnet`, following Anthropic's published Claude Code guidance that Sonnet is the recommended tier for "most engineering" work. Critic tasks are adversarial reasoning — refuting search logs, stress-testing Keeps, auditing library drift — not parallelized high-volume execution. Haiku is appropriate for the latter; sub-agents doing logical refutation work need at least Sonnet's reasoning tier.
+
 ## The 6 stages
 
 - **Input**: Receiving instructions, context, skills, CLAUDE.md, tool descriptions, and actively collecting information via Read/Grep/Glob/WebFetch, etc.
@@ -52,6 +67,12 @@ From downstream to upstream, surface two kinds of findings at each stage.
 
 Surfacing Opportunities is non-optional. A retrospective that only finds Problems is a defensive workflow, not a self-improvement one. The absence of failure does not mean the absence of room to improve.
 
+### Phase 2 verification — opportunity-finder agent (mandatory)
+
+After surfacing Opportunities, **before proceeding to Phase 3**, invoke the bundled `opportunity-finder` agent via the Agent tool (`agents/opportunity-finder.md`). Pass it your surfaced Opportunities list (which may be empty) and a brief description of the session. The agent runs in a fresh context with a default-to-find posture and returns either `no additional opportunities found` or `additional opportunities: <list>`.
+
+Merge any additional Opportunities the agent surfaces into the Phase 2 result before moving on. Do not silently discard them — that defeats the purpose of the gate.
+
 Order (reverse):
 
 1. **Output**: Excess or missing in the report / missing persistence / specifics of user dissatisfaction
@@ -80,6 +101,12 @@ Quality bar:
 
 - Not specific to this case; applicable to similar situations
 - Not "verified X" but at the level of "did not place a premise without verification"
+
+### Phase 3 verification — keep-extractor agent (mandatory)
+
+After listing Keeps, **before proceeding to Phase 4**, invoke the bundled `keep-extractor` agent via the Agent tool (`agents/keep-extractor.md`). Pass it your Keeps list and a brief description of the session. The agent runs in a fresh context with a default-to-revise posture and returns either `keeps confirmed` or `keeps need revision: <list>`.
+
+For each Keep flagged `needs revision`, revise (raise the abstraction, strip session-specific nouns, add context bounds) or drop it. Do not keep flagged Keeps unchanged — the gate exists to catch session facts and industry baselines that drift into Keeps under the main agent's bias.
 
 ## Phase 4: Top-down Try rollout (Input → Output)
 
@@ -174,11 +201,31 @@ If a rule that addresses the same Problem or Opportunity already exists, take ex
 
 Search existing CLAUDE.md / skills / agents for a rule that covers the same Problem or Opportunity. If found, apply delete, move, or fix. Merge similar items rather than stacking them; do not let the file bloat.
 
-If no existing rule covers the Problem or Opportunity → proceed to Step 6.
+**Before proceeding to Step 6, produce a Step 5 search log as literal evidence.** The log must contain:
+
+- The existing rules you reviewed (file path + brief excerpt that identifies the rule)
+- For each reviewed rule, which of delete / move / fix was attempted and why it failed (e.g. "subject mismatch — this rule addresses CI premise verification, the new finding is about pre-design industry-precedent verification, integrating would conflate two axes")
+
+A search log with zero rules reviewed is not a valid "no existing rule covers" judgment. At minimum, justify why the relevant section of CLAUDE.md / skills / agents was empty of candidates.
+
+### Step 5.5: Adversarial verification of the search log (mandatory)
+
+After producing the Step 5 search log, **before** proceeding to Step 6, invoke the bundled `search-log-critic` agent via the Agent tool to adversarially verify the log. This agent ships with the `retrospective` plugin (`agents/search-log-critic.md`) so it is always available wherever the skill is installed.
+
+Pass the agent both the candidate Problem or Opportunity and the Step 5 search log. The agent runs in a fresh context that does not share the main agent's bias toward "no existing rule covers this," and is prompted to refute the log.
+
+The agent returns exactly one verdict:
+
+- `confirmed exhaustive` → proceed to Step 6 with both the search log and the verdict attached
+- `plausible miss found: <rule file path> — <reason>` → return to Step 5, expand the search to include the surfaced rule, apply delete, move, or fix on it as appropriate, and re-run Step 5.5 with the expanded log
+
+Why this is structural rather than self-checked: single-agent self-reflection on its own search log is documented to fail via "degeneration of thought" — the reflecting model reinforces its own original bias rather than finding a genuinely new angle. The `search-log-critic` agent runs in a fresh subagent context with an adversarial role and a default-to-refute posture, which is what breaks the loop.
 
 ### Step 6: Append a new rule to workspace CLAUDE.md (last resort)
 
-Only when Steps 1–5 are all judged "checked but not applicable" with literal evidence. The target is concrete work, problem-solving, workflows, or domain knowledge specific to that workspace.
+Only when Steps 1–5 are all judged "checked but not applicable" with literal evidence. For Step 5 specifically, the evidence must include **both** the search log (existing rules reviewed + per-rule reject reason) **and** the Step 5.5 adversarial verdict of `confirmed exhaustive` from a fresh subagent. **Step 6 entry without both pieces of evidence is invalid: return to Step 5 and produce them first.**
+
+The target is concrete work, problem-solving, workflows, or domain knowledge specific to that workspace.
 
 **Why CLAUDE.md is the worst option: it is not modular and has no separation of concerns.** Steps 1–4 each carry a module boundary (design unit, guardrail unit, skill unit, agent unit). CLAUDE.md piles all responsibilities into a single file, causing bloat, context pollution, and responsibility mixing.
 
@@ -212,25 +259,67 @@ If artifacts that violate a rule you just established remain as is, the retrospe
 
 ## Submission
 
-Present the results of Phases 1–5 to the user and apply the improvements.
+Before presenting the results, invoke the bundled `curator` agent via the Agent tool (`agents/curator.md`). Pass it the workspace's rule library entry points (CLAUDE.md, wiki/discipline directory, plugin skills and agents) and the most recent retrospective Fact files. The curator returns a structured audit report.
 
-**The submission must include the following metrics:**
+Then present the submission to the user as a single readable story, not as a dump of internal phase numbers and single-letter counters. Internal labels like "Phase 1 Fact recording" or "Phase 5 Step 6" should stay internal — they are the agent's scaffolding, not user-facing structure.
 
-Surfacing (from Phase 2):
+Use the following layout, in the workspace's natural language:
 
-- problems surfaced: P
-- opportunities surfaced: O
+### 1. Headline (1–2 sentences)
 
-Rule-layer operations (from Step 5 and Step 6):
+What this retrospective changed, and what is queued for next time. The reader should grasp the outcome from the headline alone.
 
-- rules deleted: D (Step 5 delete)
-- rules moved: V (Step 5 move)
-- rules fixed: F (Step 5 fix)
-- rules appended: A (Step 6 append)
+### 2. Health checks (only if triggered, near the top)
 
-Warning conditions:
+Surface these in plain language only when the condition is met:
 
-- A > 0 with D = V = F = 0 → Step 5 was likely skipped. Confirm whether an existing rule was checked before appending a new one
-- O = 0 across consecutive retrospectives → the retrospective is stuck in Problem-only mode. No self-improvement Opportunities are being surfaced, and the workflow has degraded to defensive recurrence prevention
+- "Step 5 was likely skipped" — when one or more rules were appended this session but no rule was deleted, moved, or fixed. Confirm the Step 5.5 verdict actually came back as `confirmed exhaustive`.
+- "Stuck in defensive mode" — when no Opportunities were surfaced this session and the same was true across several recent retrospectives. The workflow has degraded into Problem-only recurrence prevention.
+
+Omit the section entirely if nothing is triggered.
+
+### 3. What we changed
+
+For each delete, move, fix, or append actually applied this session, one line each. No nesting, no separate sections per operation type — let the reader scan them together:
+
+- `delete <rule path>` — one-phrase reason
+- `move <rule path> to <new location>` — one-phrase reason
+- `fix <rule path>` — one-phrase summary of the content change
+- `append <rule path>` — one-phrase summary of the new rule
+
+If nothing was applied this session, say so in one sentence ("No rule changes applied this session — the surfaced items routed to upstream Steps 1–4 instead, see <reference>").
+
+### 4. Queued for next time
+
+The top 3–5 highest-priority findings from the curator audit, each as one line. Less urgent findings remain in the full curator audit (link or appendix). Empty section is fine — say "No queued items from the curator this session."
+
+### 5. Counters (footer)
+
+A small footer with the raw counts, for trend tracking across retrospectives. Put it last so it does not dominate the report:
+
+- surfaced: <N> problems, <M> opportunities
+- applied: <D> delete, <V> move, <F> fix, <A> append
+
+### Example shape of the final report
+
+```
+The OAuth refactor surfaced one slow-path bug and one verification-skipped opportunity. Fixed the existing "verify against primary source" rule to cover OAuth state callbacks; one obsolete rule queued for next time.
+
+Stuck in defensive mode — last three retrospectives surfaced zero opportunities. Widen the Phase 2 opportunity scan next session.
+
+What we changed:
+- fix discipline/work-protocols.md "premise verification" — extended to cover OAuth state callbacks alongside CI premise
+- delete discipline/agent-discipline.md "use literal error string for tests" — superseded by spec/error_matchers
+- append discipline/session-discipline.md "rotate OAuth client secrets per environment" — closes a long-running confusion
+
+Queued for next time (from the curator):
+- discipline/session-discipline.md "shadow branch autonomy" overlaps fixture-project-edits-autonomous memory — merge candidate
+- skills/aratame-validation example block references deleted fixture path — fix candidate
+
+surfaced: 3 problems, 1 opportunity
+applied: 1 delete, 0 move, 1 fix, 1 append
+```
+
+The example shows the layout, not a target — real retrospectives have varied content. The point is the order (headline, health, changes, queued, counters) and the plain-language tone, not the specific items.
 
 After application, if there are uncommitted changes, autonomously commit and push.
