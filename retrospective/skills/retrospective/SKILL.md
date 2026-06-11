@@ -149,13 +149,34 @@ Judgment:
 - Yes → apply and end the flow
 - No → proceed to Step 5. Record why you judged it impossible
 
-### Step 5: Append to workspace CLAUDE.md (last resort)
+### Step 5: Update an existing rule (preferred over adding new)
 
-Only when Steps 1–4 are all judged impossible. The target is concrete work, problem-solving, workflows, or domain knowledge specific to that workspace.
+If a similar rule already exists, revise its wording, placement, or priority instead of adding a new rule. Recurrence of a Problem despite an existing rule is evidence the rule's wording is unclear, its placement is suboptimal, or its priority is too low. Fix the rule itself.
+
+- Search existing CLAUDE.md / skills / agents for a rule that covers the same Problem
+- If found, revise its wording, placement (which file, which section), or priority (which order in the list)
+- Merge similar items rather than stacking them. Do not let the file bloat
+- Do not leave a non-functional rule in place while adding similar rules on top — face the cause (wording, placement, priority) of why the existing rule failed to fire
+
+If no similar existing rule covers the Problem → proceed to Step 6.
+
+### Step 6: Append a new rule to workspace CLAUDE.md (last resort)
+
+Only when Steps 1–5 are all judged "checked but not applicable" with literal evidence. The target is concrete work, problem-solving, workflows, or domain knowledge specific to that workspace.
 
 **Why CLAUDE.md is the worst option: it is not modular and has no separation of concerns.** Steps 1–4 each carry a module boundary (design unit, guardrail unit, skill unit, agent unit). CLAUDE.md piles all responsibilities into a single file, causing bloat, context pollution, and responsibility mixing.
 
-### Handling the global layer
+The new rule must satisfy all of the following:
+
+- **One principle per line.** Examples minimized
+- **Positive framing.** Write what to do, not what not to do (e.g. "Verify against primary source" instead of "Do not assume from secondary source")
+- **WHY embedded in one sentence.** Include the motivation alongside the rule itself; do not rely on the establishment link to carry the why
+- **No coined terms.** Use the vocabulary of the actual fix, not the retrospective's narrative literal text. Coined labels (made up to describe the failure) become brittle hardcoded logic and lose meaning when revisited later
+- **Establishment link at the end.** Append a link to the retrospective record that established this rule
+
+If these constraints cannot all be satisfied, return to Step 5 and force-revise an existing rule instead.
+
+#### Handling the global layer
 
 **As a retrospective outcome, do not modify the global layer (everything under `~/.claude/`: CLAUDE.md, skills, agents, settings.json, etc.).** Additions, deletions, and modifications are all forbidden.
 
@@ -163,17 +184,9 @@ Extraction to the global layer is **overreach**. Even if a Phase 4 target is jud
 
 All retrospective outcomes are written to workspace-local locations only. Placements are workspace CLAUDE.md, skills, or agents.
 
-### Discipline (common to CLAUDE.md edits)
+### Step 7: Retroactively apply new rules to session artifacts
 
-- If a Problem recurs that an existing rule should cover, revise that rule's wording, placement, or priority. Do not leave a non-functional rule in place while stacking similar rules on top
-- Do not feel you have handled a problem just by adding a rule. Recurrence is evidence of a defect in an existing rule; face the cause (wording, placement, priority)
-- One principle per line. Examples minimized
-- Merge similar items. Do not let it bloat
-- Do not mix layers. Do not write concrete work into the global layer
-
-### Step 6: Retroactively apply new rules to session artifacts
-
-Once Steps 1–5 produce a new rule / skill / guardrail, retroactively check the artifacts already produced in this session (issues, MR descriptions, comments, docs, code, commit messages) against the new rule.
+Once Steps 1–6 produce a new rule / skill / guardrail, retroactively check the artifacts already produced in this session (issues, MR descriptions, comments, docs, code, commit messages) against the new rule.
 
 - Establishment and application are separate steps. Creation alone does not improve recent outputs
 - When you detect a violation of the new rule, update the original artifact (GitLab / GitHub / file)
@@ -183,4 +196,14 @@ If artifacts that violate a rule you just established remain as is, the retrospe
 
 ## Submission
 
-Present the results of Phases 1–5 to the user and apply the improvements. After application, if there are uncommitted changes, autonomously commit and push.
+Present the results of Phases 1–5 to the user and apply the improvements.
+
+**The submission must include bloat metrics:**
+
+- rules added: N (Step 6 newly appended)
+- rules revised: M (Step 5 existing rule changes)
+- rules removed: K (existing rules deleted as no longer needed)
+
+If N > 0 and M = 0, prompt the user to confirm Step 5 (revise existing) was checked. Continuous N > 0 with M = K = 0 across retrospectives is evidence that Step 5 is being skipped.
+
+After application, if there are uncommitted changes, autonomously commit and push.
