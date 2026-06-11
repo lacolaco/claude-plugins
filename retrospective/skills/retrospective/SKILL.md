@@ -34,13 +34,23 @@ Record the facts that occurred at each of the 6 stages, in chronological order. 
 - **Inspection**: Verifications performed / acceptance criteria adopted
 - **Output**: Content reported / whether it was persisted / user reaction (dissatisfaction, satisfaction)
 
-## Phase 2: Bottom-up Problem surfacing (Output → Input)
+## Phase 2: Bottom-up surfacing — Problems and Opportunities (Output → Input)
 
-From downstream to upstream, surface Problems at each stage. At every stage, ask:
+From downstream to upstream, surface two kinds of findings at each stage.
+
+**Problems** (failures and defects that actually occurred):
 
 1. What Problem occurred at this stage?
 2. Could this stage have detected or corrected the downstream Problem?
 3. Is the true cause here, or further upstream?
+
+**Opportunities** (no failure occurred, but a better outcome was possible):
+
+4. What worked at this stage but could have been better (faster, more precise, less costly)?
+5. What new tool, pattern, skill, or workflow could have been adopted at this stage?
+6. What did the ideal outcome look like at this stage, and what gap remained between the actual result and that ideal?
+
+Surfacing Opportunities is non-optional. A retrospective that only finds Problems is a defensive workflow, not a self-improvement one. The absence of failure does not mean the absence of room to improve.
 
 Order (reverse):
 
@@ -73,12 +83,15 @@ Quality bar:
 
 ## Phase 4: Top-down Try rollout (Input → Output)
 
-For the true causes identified in Phase 2, establish Tries from upstream downward. **A hole plugged upstream is not plugged again downstream.**
+For both the true causes (from Problems) and the Opportunities identified in Phase 2, establish Tries from upstream downward. **A hole plugged upstream is not plugged again downstream.**
 
 Before establishing a Try at each stage, ask:
 
 - If the true cause was already cut off upstream, no countermeasure is needed at this stage
+- For Opportunities, ask whether an upstream adoption (e.g. a new tool earlier in the pipeline, a new skill that re-shapes Planning) is sufficient before adding stage-local Tries
 - Layered defense is applied only when the upstream countermeasure is low-confidence
+
+Tries from Problems address recurrence (defensive). Tries from Opportunities adopt new tools, patterns, or workflows (progressive). Both kinds of Tries flow through the same Phase 5 implementation ladder.
 
 Order (forward):
 
@@ -149,16 +162,19 @@ Judgment:
 - Yes → apply and end the flow
 - No → proceed to Step 5. Record why you judged it impossible
 
-### Step 5: Update an existing rule (preferred over adding new)
+### Step 5: Operate on an existing rule (preferred over adding new)
 
-If a similar rule already exists, revise its wording, placement, or priority instead of adding a new rule. Recurrence of a Problem despite an existing rule is evidence the rule's wording is unclear, its placement is suboptimal, or its priority is too low. Fix the rule itself.
+If a rule that addresses the same Problem or Opportunity already exists, take exactly one of three actions on it:
 
-- Search existing CLAUDE.md / skills / agents for a rule that covers the same Problem
-- If found, revise its wording, placement (which file, which section), or priority (which order in the list)
-- Merge similar items rather than stacking them. Do not let the file bloat
-- Do not leave a non-functional rule in place while adding similar rules on top — face the cause (wording, placement, priority) of why the existing rule failed to fire
+- **delete** — the rule is no longer needed (the underlying condition is gone, or the rule was wrong in the first place)
+- **move** — the rule belongs in a different file or section (placement is the defect)
+- **fix** — the rule's content is wrong; change what it actually requires (the rule failed to capture what should be required, or its scope is misaligned with reality)
 
-If no similar existing rule covers the Problem → proceed to Step 6.
+"Re-wording" the rule (changing the rhetorical surface without changing what it actually requires) is explicitly out of scope here. If a rule fails to fire despite being "right," the issue is delete (unneeded), move (wrong placement), or fix (wrong content). It is never a wording issue. Treating it as a wording issue routes the agent away from the structural problem and into low-cost rhetorical edits that don't change behavior.
+
+Search existing CLAUDE.md / skills / agents for a rule that covers the same Problem or Opportunity. If found, apply delete, move, or fix. Merge similar items rather than stacking them; do not let the file bloat.
+
+If no existing rule covers the Problem or Opportunity → proceed to Step 6.
 
 ### Step 6: Append a new rule to workspace CLAUDE.md (last resort)
 
@@ -198,12 +214,23 @@ If artifacts that violate a rule you just established remain as is, the retrospe
 
 Present the results of Phases 1–5 to the user and apply the improvements.
 
-**The submission must include bloat metrics:**
+**The submission must include the following metrics:**
 
-- rules added: N (Step 6 newly appended)
-- rules revised: M (Step 5 existing rule changes)
-- rules removed: K (existing rules deleted as no longer needed)
+Surfacing (from Phase 2):
 
-If N > 0 and M = 0, prompt the user to confirm Step 5 (revise existing) was checked. Continuous N > 0 with M = K = 0 across retrospectives is evidence that Step 5 is being skipped.
+- problems surfaced: P
+- opportunities surfaced: O
+
+Rule-layer operations (from Step 5 and Step 6):
+
+- rules deleted: D (Step 5 delete)
+- rules moved: V (Step 5 move)
+- rules fixed: F (Step 5 fix)
+- rules appended: A (Step 6 append)
+
+Warning conditions:
+
+- A > 0 with D = V = F = 0 → Step 5 was likely skipped. Confirm whether an existing rule was checked before appending a new one
+- O = 0 across consecutive retrospectives → the retrospective is stuck in Problem-only mode. No self-improvement Opportunities are being surfaced, and the workflow has degraded to defensive recurrence prevention
 
 After application, if there are uncommitted changes, autonomously commit and push.
