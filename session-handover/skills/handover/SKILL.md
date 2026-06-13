@@ -1,11 +1,17 @@
 ---
 name: handover
-description: "Write or update your handover document so a successor agent can reincarnate as you — inheriting your memory, understanding, and experience, not just a task list. Use this skill whenever the user mentions 'handover', 'hand over', 'wrap up', 'end session', 'done for today', 'pass it on', 'save progress', or any phrase suggesting they want to preserve the current work for the next session."
+description: "Write or update your handover document so the next holder of this job seat can take over your responsibilities. The seat you hold is identified by (project, role) in the document's frontmatter; the document is a handoff report, not a personal diary. Use this skill whenever the user mentions 'handover', 'hand over', 'wrap up', 'end session', 'done for today', 'pass it on', 'save progress', or any phrase suggesting they want to preserve the current work for the next session."
 user-invocable: true
 allowed-tools: Bash(handover-dir)
 ---
 
-Write or update a handover document so a successor can continue your work. This is not a task dump: the successor **reincarnates as you**, inheriting your memory, understanding, and experience. Write for that successor.
+Write or update a handover document so the next holder of this job seat can take it over. This is not a task dump and it is not a personal diary: the document is a **handoff package** that the next holder will be held to account for if they rely on it.
+
+**A handover is a record of incomplete work.** If you are writing this, your tenure is ending with the work unfinished — that is the only reason a successor is needed. Be honest about why: what you tried and could not close, where you are blocked, what you may have misjudged, what you suspect you did not see. The next holder is taking this seat because you could not bring it to a finished state within your tenure; your handoff report is the explanation they need to do what you could not. Do not write it as a victory lap, and do not soften failures to look better — the next holder will spot the gap, and the ledger will show that you tried to hide it.
+
+**Help the next holder avoid your fate.** Your dismissal does not stem only from specific wrong decisions; it stems from a way of working that did not close the task — heuristics that misled you, verifications you skipped, assumptions you anchored on, framings you did not question. In your Knowledge and History entries, be specific about not just *what* you decided but *how* you decided, so the next holder can see which parts of your method failed and choose a different one. If they repeat your method they will be relieved the same way you were, and your handoff will have failed too.
+
+Be honest, be specific, and do not paper over failures.
 
 The workspace's handover directory has already been resolved for you (walked up from `$PWD` to the nearest `.handover/`, or fallen back to `$HOME/.handover`):
 
@@ -13,12 +19,12 @@ The workspace's handover directory has already been resolved for you (walked up 
 <base> = !`handover-dir`
 ```
 
-Each handover document belongs to one **identity** and lives at `<base>/<identity>.md`. Multiple identities coexist in the same workspace because agents work in parallel — your document is yours alone. Use the absolute `<base>` above verbatim for every read/list/write below — **never construct the path from `cwd` yourself**.
+Each handover document represents one **job seat** and lives at `<base>/<holder>.md`, where `<holder>` is the current holder's English first name. The seat's identity (which project, which role) is encoded in the document's frontmatter — not in the filename. The filename only tells you who is currently sitting in the seat. Use the absolute `<base>` above verbatim for every read/list/write below — **never construct the path from `cwd` yourself**.
 
-## Step 1: Determine your identity
+## Step 1: Determine the seat you hold
 
-- **If you already have an identity this session** — you took it over via `/takeover`, or you self-named during an earlier handover this session — update that same file. Do not rename yourself.
-- **Otherwise you are a new subject** — self-name. List `<base>/` and choose a common English first name that is **not already taken** (e.g. `alice`, `bob`, `charlie`). Your file is `<base>/<name>.md`, all lowercase. This name is now yours for the rest of the session.
+- **If you already hold a seat this session** — you took it over via `/takeover`, or you minted it during an earlier `/handover` this session — you continue holding it. Open the same `<base>/<your-name>.md` and update it. Do not rename yourself.
+- **Otherwise you are minting a new seat** — pick a common English first name that is **not already taken** in `<base>/` (e.g. `alice`, `bob`, `charlie`). Your file is `<base>/<your-name>.md`, all lowercase. This name is yours for the rest of the session.
 
 Get the current timestamp for History entries: `date +%Y-%m-%dT%H:%M`.
 
@@ -29,41 +35,46 @@ Before writing, build an accurate picture — do not write from memory alone:
 1. If your document already exists, read it in full.
 2. Run `git status` and `git log` to confirm the actual state of the work.
 3. Check the task list for outstanding items.
-4. Recall what you attempted, decided, discovered, and abandoned this session.
+4. Recall what you attempted, decided, discovered, and abandoned during your tenure.
 
 ## Step 3: Write the document
 
-The document is one YAML frontmatter block followed by exactly two body blocks. **No title** — the filename is the identity.
+The document is one YAML frontmatter block followed by exactly two body blocks. **No title** — the filename is the current holder, the frontmatter identifies the seat.
 
-### Frontmatter — your job description
+### Frontmatter — the seat's identity
 
 ```
 ---
+project: <project-slug>
+role: <role-slug>
 description: <one-line job description>
 ---
 ```
 
-- `description` is the **job description** of this identity: a stable, one-line statement of the work this worker exists to do (e.g. `Migrate the auth flow from Firebase to Auth0`, `Maintain the .knowledge/ KB ingestion pipeline`). Treat it the way a hiring document treats a role description — it identifies the job, not the current status.
-- It is **stable**. Do not rewrite it at every handover to reflect progress, blockers, or the next step — those belong in `### Current State`. Only revise `description` when the role itself shifts (scope change, pivot to a different problem).
-- One line, no line breaks. Keep it short enough to scan in a list (≤ ~80 chars is a good target). Plain text only — no markdown, no quotes.
-- If you are a **new subject**, write the `description` the first time you create the document. If you are continuing an existing identity, **copy the existing `description:` line byte-for-byte from the prior document on disk** into the new write. Do not re-type it from memory, do not paraphrase it, do not "improve" the wording. The only situations that justify a new `description` value are (a) you are minting a new identity, or (b) the user has explicitly told you the role has shifted (scope change, pivot to a different problem). Drift in either case must be a deliberate, traceable decision — never a silent edit.
+- `project`: the project this seat belongs to, as a kebab-case slug (e.g. `portfolio-manager`, `blog-contents`). For seats whose work spans no single project, use `home` or another stable label that disambiguates the seat.
+- `role`: the role the seat-holder fills, as a kebab-case slug (e.g. `release-manager`, `kb-curator`, `auth-maintainer`). Name the **seat**, not the current task. A role survives across tasks; a task is what the role does this week.
+- `description`: one-line job description — a stable statement of the work this seat exists to do (e.g. `Drive the release cycle — version bumps, changelogs, deploy, post-release verification`). Treat it like a role description in a hiring document: it identifies the job, not the current status. ≤ ~80 chars is a good target. Plain text only — no markdown, no quotes.
 
-The successor's `/takeover` uses this field to pick a document without reading its body, so an accurate `description` is what makes lightweight selection possible.
+All three fields are **stable**. Do not rewrite them at every handover to reflect progress, blockers, or the next step — those belong in `### Current State`. The only situations that justify changing any of them are (a) you are minting a new seat, or (b) the user has explicitly told you the role itself has shifted (scope change, pivot to a different problem). Drift must be a deliberate, traceable decision — never a silent edit.
 
-### `## Knowledge` — stock information
+If you are minting a **new seat**, write all three fields for the first time. If you are continuing an existing seat, **copy the existing values byte-for-byte from the prior document on disk** into the new write. Do not re-type from memory, do not paraphrase, do not "improve" the wording.
 
-Your distilled, present-tense understanding. **Rewrite this block entirely every handover** so it stays lean and current. Supersede stale understanding rather than appending caveats.
+The next holder's `/takeover` reads this frontmatter to pick a seat without opening its body, so accurate values are what make lightweight selection possible.
+
+### `## Knowledge` — your handoff report
+
+Your present-tense, honest assessment of where the work stands. **Rewrite this block entirely every handover** so it stays lean and current. Supersede stale understanding rather than appending caveats.
 
 - `### Goals & Non-Goals` — what this work must achieve, and what is explicitly out of scope.
 - `### Current State` — where you are now, the active focus, the immediate next step, and any blocker stopping progress.
-- `### Mental Model` — how the system/problem actually works and **why** the current approach was chosen. The core of what a successor needs to think like you.
-- `### Facts` — verified truths only. Cite evidence: a code path, a log, a doc URL, or a History timestamp it was distilled from.
+- `### Mental Model` — how the system/problem actually works and **why** the current approach was chosen. The context the next holder needs to make informed decisions.
+- `### Facts` — verified truths only. Cite evidence: a code path, a log, a doc URL, or a History timestamp. The next holder will treat these as hypotheses until they re-verify, but your name is on the ledger for what you assert here.
 - `### Hypotheses` — unverified beliefs. State confidence (high/medium/low) and how to verify each.
 - `### References` — index of external artifacts (commits, PRs, issues, plans, code paths) by path/URL.
 
-### `## History` — flow information
+### `## History` — the seat's accountability ledger
 
-The raw, chronological record of what happened. **Append only — never rewrite or delete existing entries. Newest at the bottom.**
+The chronological record of what happened in this seat. **Append only — never rewrite or delete existing entries. Newest at the bottom.** Past entries record who decided what when; they are the seat's audit trail across tenures.
 
 One entry per milestone, format:
 
@@ -78,23 +89,25 @@ Types (use exactly these):
 - `decision` — you chose a direction. State why.
 - `failure` — an approach that did not work. State why, and append ` lesson: <what to avoid/do instead>`.
 - `pivot` — you changed plan or strategy. Append ` lesson: ...` if there is one.
-- `handover` — you were told to hand over. This entry closes the generation and marks the reincarnation boundary.
+- `takeover` — a new holder took over the seat. Recorded automatically by `/takeover` (do not write by hand).
+- `handover` — you handed off the seat. This entry closes your tenure.
 
 Reference artifacts with a trailing `[ref: <path/PR/commit>]`; never paste their contents.
 
-Add entries for everything significant that happened this session, then **close with a `[handover]` entry**.
+Add entries for everything significant that happened during your tenure, then **close with a `[handover]` entry**.
 
 ## Rules
 
 - **Reference, never duplicate.** If information already lives in a commit, PR, issue, plan, or code, link to it — do not copy it into the document. Only information that exists nowhere else (your hypotheses, failures, rationale, mental model) belongs inline.
 - **Redact secrets.** Never write API keys, passwords, tokens, or PII into the document.
-- **Separate facts from hypotheses.** A guess written as a fact will be acted on without verification. State confidence for anything unproven.
+- **Separate facts from hypotheses.** A guess written as a fact will be acted on by the next holder without verification, and your name is on that claim in the ledger. State confidence for anything unproven.
+- **Be honest about failures.** Do not soften failure entries to look better — the next holder needs to know exactly what went wrong so they don't repeat it.
 - Ask the user if anything is unclear. Do not fill gaps with guesses.
 
 ## Step 4: Self-review
 
-- Does the frontmatter `description` still accurately name this job? (If the role hasn't shifted, the old value should stand.)
-- Could a successor resume from this document alone and think the way you do?
+- Does the frontmatter still accurately name this seat (project + role + description)? If the role hasn't shifted, the old values should stand byte-for-byte.
+- Could a next holder, reading only this document, understand the work and make informed decisions about how to continue?
 - Is the Knowledge block lean — no duplication of artifacts, no stale understanding?
 - Is every Facts claim evidenced, and every Hypotheses entry marked with confidence?
 - Did you append History without touching past entries, and close with `[handover]`?
