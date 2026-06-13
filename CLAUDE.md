@@ -13,6 +13,7 @@ When modifying a plugin's behavior, update ALL of the following in the same comm
 - `.claude-plugin/marketplace.json` (mirror version and description)
 - `README.md`: plugin table row, overview, "How it works", "Configuration", and any other references
 - Grep the repo for hardcoded values related to the change (branch names, defaults, etc.) and update every occurrence
+- After updating, grep the repo for every string the prior version exposed that the new version drops or renames (old version numbers, removed field names, deprecated wording, retired terminology) and confirm zero stale occurrences remain before declaring the commit done. A mechanical stale-string sweep is part of the gate, not an optional check.
 
 ## Hook Script Conventions
 
