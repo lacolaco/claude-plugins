@@ -1,0 +1,11 @@
+{
+  "name": "tech-writing",
+  "description": "Japanese technical writing norms for books, articles, and documentation. Covers formatting (one sentence per line, footnotes, column headings), paragraph structure (paragraph writing), argumentative rigor, reader cognitive load management, perspective and narration, restraint in rhetoric, LLM-style filler prohibition, and redundancy elimination.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Suguru Inatomi"
+  },
+  "repository": "https://github.com/lacolaco/claude-plugins",
+  "license": "MIT",
+  "keywords": ["japanese", "technical-writing", "style-guide", "proofreading", "editing"]
+}

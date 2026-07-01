@@ -1,0 +1,91 @@
+{
+  "groups": {
+    "Major SaaS / hosting / service brands": [
+      "Anthropic",
+      "Claude",
+      "GitLab",
+      "GitHub",
+      "Slack",
+      "Notion",
+      "Datadog",
+      "Vercel",
+      "ChatGPT",
+      "AWS",
+      "Apache"
+    ],
+    "Programming languages": [
+      "TypeScript",
+      "JavaScript",
+      "Ruby",
+      "Python",
+      "Go",
+      "Rust",
+      "Java"
+    ],
+    "Markup / serialization name (proper noun)": [
+      "Markdown"
+    ],
+    "Runtimes / OS": [
+      "Node",
+      "Linux",
+      "macOS",
+      "Windows"
+    ],
+    "Major frameworks": [
+      "Angular",
+      "Vue",
+      "React",
+      "Rails"
+    ],
+    "Established technical specs / protocols (compound names included)": [
+      "OpenTelemetry",
+      "OAuth",
+      "OAuth2",
+      "OpenAPI",
+      "WebSocket",
+      "WebRTC",
+      "gRPC",
+      "Atom"
+    ],
+    "Web platform / runtime formats": [
+      "WebAssembly",
+      "WASM"
+    ],
+    "Character encodings": [
+      "UTF8",
+      "UTF16"
+    ],
+    "Cryptography algorithms / key formats (spec names)": [
+      "SHA256",
+      "SHA512",
+      "MD5",
+      "Ed25519",
+      "ED25519",
+      "PKCS12"
+    ],
+    "Compression algorithms": [
+      "LZ4",
+      "Zstandard",
+      "ZSTD"
+    ],
+    "CPU / virtualization": [
+      "x86",
+      "AMD64",
+      "QEMU"
+    ],
+    "Major package managers / core shells (= command names)": [
+      "npm",
+      "npx",
+      "git",
+      "docker",
+      "bash",
+      "zsh",
+      "sh"
+    ],
+    "Spec / standard names (compound phrases)": [
+      "Conventional Commits",
+      "Semantic Versioning",
+      "SemVer"
+    ]
+  }
+}
