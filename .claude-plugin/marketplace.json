@@ -40,6 +40,12 @@
       "description": "Reproducible Japanese prose quality checker for persistent layers (memory, CLAUDE.md, skill definitions, style guides). Combines textlint-ja rules with custom rules (em-dash prohibition, English word detection, heading separator ban) to enforce writing discipline. No auto-fix — detection only. Requires Node.js (npx).",
       "version": "1.0.0",
       "source": "./memory-sanitize"
+    },
+    {
+      "name": "llm-wiki",
+      "description": "Knowledge base management skills for the LLM Wiki pattern (Karpathy-style). Provides ingest, query, lint (OKF v0.1 conformance), and sync. The KB lives at ~/.knowledge/ with a raw/wiki two-layer layout.",
+      "version": "1.0.0",
+      "source": "./llm-wiki"
     }
   ]
 }
