@@ -7,7 +7,7 @@ Claude Code plugins by lacolaco.
 | Plugin | Description |
 |--------|-------------|
 | [protect-main-branch](./protect-main-branch) | Prevent git operations that would modify the main branch (configurable) |
-| [session-handover](./session-handover) | Job-succession handover/takeover: each document is a job seat identified by (project, role); the successor renames it to their own name, audits the inherited handoff report, and continues under fresh accountability |
+| [session-handover](./session-handover) | Job-succession handover/takeover: each document is a job seat identified by (project, role); the successor renames it to their own name, audits the inherited handoff report, reads every referenced artifact via mandatory read tasks, and continues under fresh accountability |
 | [retrospective](./retrospective) | Structured 6-stage retrospective for tasks, PRs, and incidents |
 | [session-tts](./session-tts) | Read Claude Code responses aloud locally with a different Japanese voice per session. Instructs Claude to deliver mid-turn progress narration via a synchronous Bash call into the say adapter. Permission prompts include the workspace name. ON by default; playback volume is adjustable via `/session-tts:volume`. Engine and voices are managed automatically (Apple Silicon) |
 
@@ -90,7 +90,7 @@ The allowlist accepts any subcommand, including `commit` and `push` — the plug
 Carries work across Claude Code sessions as **job succession**, not as a reincarnated identity. The document is a handoff report and an accountability ledger; the successor audits the predecessor's claims before relying on them, and continues under their own name.
 
 - **`/handover`** — write or update your handover document so the next holder of this seat can take it over
-- **`/takeover`** — take over a job seat: rename the document to your own name, audit the prior holder's report, and continue under fresh accountability
+- **`/takeover`** — take over a job seat: rename the document to your own name, audit the prior holder's report, read every referenced artifact before doing any work, and continue under fresh accountability
 
 ### Conceptual frame: succession, not reincarnation
 
@@ -145,10 +145,11 @@ Artifacts (commits, PRs, issues, code) are **referenced, never duplicated**; onl
 2. The file is renamed `<predecessor>.md` → `<successor>.md`.
 3. A `[takeover]` entry is appended to `## History` noting the predecessor and whether the seat was closed properly (`[handover]` last) or forcibly taken.
 4. The successor reads the full handoff package and treats every Knowledge claim as a hypothesis until they verify it against reality. Divergences are recorded as `finding` entries in `## History`; the `## Knowledge` block is reconciled at the successor's next `/handover`, when their audited understanding replaces the predecessor's report under their own name.
+5. Every `References` entry and every `[ref: ...]` in `## History` becomes a **mandatory read task** — one task per unique artifact, bundles decomposed mechanically, no relevance judgment allowed. The successor drains all read tasks before any work starts, recording a short digest per artifact; unreachable artifacts are recorded as `finding` entries, never silently skipped. (The takeover skill's Steps 6–7 are the canonical definition.)
 
 **Forced takeover**: if the predecessor did not close their tenure with `[handover]` (their session ended without `/handover`, or they vacated abruptly), takeover is still allowed. The `[takeover]` entry records the irregular transition.
 
-Outstanding work is externalized to the task tool so it survives context compression.
+Outstanding work is externalized to the task tool so it survives context compression, and task status is kept current (`in_progress` on start, `completed` only when done) so the task list is always a truthful progress report.
 
 ### Upgrading from v3.x
 

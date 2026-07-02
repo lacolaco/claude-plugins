@@ -1,6 +1,6 @@
 ---
 name: takeover
-description: "Take over a job seat left by a previous holder — adopt responsibility for the work going forward, audit the predecessor's claims before relying on them, and continue under your own name. The predecessor's report is yours to audit, not yours to inherit unexamined. Use this skill whenever the user mentions 'takeover', 'take over', 'resume', 'continue', 'pick up where we left off', or any phrase suggesting they want to continue a previous agent's work."
+description: "Take over a job seat left by a previous holder — adopt responsibility for the work going forward, audit the predecessor's claims before relying on them, and continue under your own name. Every referenced artifact becomes a mandatory read task, drained before any work starts. The predecessor's report is yours to audit, not yours to inherit unexamined. Use this skill whenever the user mentions 'takeover', 'take over', 'resume', 'continue', 'pick up where we left off', or any phrase suggesting they want to continue a previous agent's work."
 user-invocable: true
 allowed-tools: Bash(handover-dir)
 ---
@@ -56,7 +56,9 @@ Get the current timestamp: `date +%Y-%m-%dT%H:%M`.
 
 ## Step 3: Read the handoff package
 
-Read the entire document before doing anything else. **Do not read or write code, or run `git` operations, until Steps 3–5 are complete.** Acting on a stale assumption wastes time and introduces bugs.
+Read the entire document before doing anything else. Acting on a stale assumption wastes time and introduces bugs.
+
+**The work gate.** Until Steps 3–6 are complete and every read task from Step 6 is completed, do no work: do not start work tasks, do not read or edit repository code outside of draining read tasks, do not run tests or investigate, and do not run `git` operations — except the read-only commands this skill itself requires (`git rev-parse` in Step 4; `git show` / `git log` to read a referenced commit or PR while draining in Step 7). Draining read tasks is part of the takeover, not work. This is the gate's only definition; Steps 6 and 7 refer back to it.
 
 Process the frontmatter and both body blocks:
 
@@ -69,12 +71,13 @@ Process the frontmatter and both body blocks:
 - `Mental Model` — the predecessor's documented rationale. Useful context, but you do not have to think like they thought — and in fact, their thinking is what failed to close the work. Form your own view as you audit, and be willing to discard their model if a different one fits reality better.
 - `Facts` — stated by the predecessor as verified. **Treat every claim as a hypothesis until you verify it yourself.** Their name is on the ledger for these claims, but the moment you act on one, the consequence is yours. Their track record — being relieved without finishing — should inform how heavily you doubt their stated certainties.
 - `Hypotheses` — unverified. Follow the stated verification methods, but consider that important hypotheses the predecessor should have stated may be absent (the unknown unknowns that contributed to their being relieved).
-- `References` — the index of external artifacts; open them as needed instead of expecting their contents inline.
+- `References` — the index of external artifacts. Do not open them ad hoc during the audit: every entry becomes a mandatory read task in Step 6.
 
 **`## History`** — the seat's accountability ledger:
 - `failure` entries are constraints — do not repeat these dead-ends. Honor their `lesson:`.
 - `decision` entries tell you *why* the work took its shape, recorded by whoever made the call at the time.
 - `takeover` / `handover` entries mark prior tenure boundaries. Everything between the most recent `[takeover]` (or the start of the file) and the most recent `[handover]` is the predecessor's tenure.
+- `[ref: ...]` citations in any entry become mandatory read tasks in Step 6 — do not open them ad hoc during the audit.
 
 ## Step 4: Migrate legacy frontmatter (if needed)
 
@@ -106,16 +109,28 @@ Where `<succession-note>` is one of:
 
 The forced-takeover note is part of the accountability record. The seat is yours either way, but the ledger reflects how it transferred.
 
-## Step 6: Externalize the work
+## Step 6: Externalize the reads and the work
 
-Create tasks from `Current State`'s next step and any outstanding work, using the task tool. The document remains the source of truth for the seat; the task list is your working view that survives context compression as the session grows.
+Externalize the takeover into the task tool before doing anything else (the work gate from Step 3 holds throughout). Create, in this order:
 
-## Step 7: Verify, then execute — and work differently
+1. **One read task per referenced artifact.** Enumerate every entry in `### References` and every `[ref: ...]` anywhere in `## History`. Relevance is not your call: do not filter by "irrelevant", "already familiar", or "too long" — relevance is judged after reading, never before.
+   - **Decompose bundles mechanically.** A bullet or `[ref:]` that names several artifacts (multiple commits, brace-expanded paths, "A and B") yields one task per named artifact. Decomposition is never a reason to drop one.
+   - **Dedupe by artifact, not by string.** Two citations are the same artifact when they point at the same file, directory, PR, issue, commit, or URL once line numbers, section anchors, and notation differences are ignored (a PR number and its URL are one artifact). Create one task per artifact.
+   - **Title each task `Read: <locator>`**, using the most concrete locator cited. A citation with no resolvable locator still gets a task — resolving it is part of reading it; if it cannot be resolved, Step 7 records it as unreachable.
+   - Zero read tasks is legitimate only when the document contains zero References entries and zero `[ref:]` citations.
+2. **Work tasks.** Create tasks from `Current State`'s next step and any other outstanding work.
 
-1. Work through the tasks.
-2. Before acting on any inherited claim, cross-check it against reality — code, logs, tests. Do not take the document at face value.
-3. **When the document and reality diverge, append a `finding` entry to the `## History` block** recording the divergence (newest at the bottom; never edit past entries). Reconcile the `## Knowledge` block at your next `/handover` — that is when your audited understanding replaces the predecessor's report under your name.
-4. **Change how you work, not just which decisions you make.** Running the predecessor's method on a different question produces the predecessor's outcome on a different question. As you uncover what they missed, name the process gap that let it slip through — and adopt an explicit safeguard against it in your own work. The seat will be relieved from you too if you fall into the same pits.
+Report the full created task list to the user: a reference without a read task is a visible skip. The document remains the source of truth for the seat; the task list is your working view that survives context compression as the session grows.
+
+## Step 7: Read, verify, then execute — and work differently
+
+1. **Drain every read task first — the work gate (Step 3) holds until the last one is completed.** For each task: set it `in_progress`, read the artifact, record a one-or-two-line digest on the task (what the artifact is; what it constrains or tells you about the work), then set it `completed`. The digest is what survives context compression — a read without a digest is a read the session will forget.
+   - Reading means: a file — read it; a commit — `git show` it; a PR or issue — read its description, discussion, and changed-file list; a directory or repository — read its top-level structure plus the files the citing entry names, and state in the digest what you did not descend into.
+   - If an artifact cannot be resolved or opened (dead link, missing file, permission denied, no locator), append a `finding` entry to `## History` recording that, write the failure as the task's digest, then complete the task — unreachable is recorded, never silently skipped.
+2. Work through the work tasks, keeping their status current: `in_progress` when you start one, `completed` only when it is actually done.
+3. Before acting on any inherited claim, cross-check it against reality — code, logs, tests. Do not take the document at face value.
+4. **When the document and reality diverge, append a `finding` entry to the `## History` block** recording the divergence (newest at the bottom; never edit past entries). Reconcile the `## Knowledge` block at your next `/handover` — that is when your audited understanding replaces the predecessor's report under your name.
+5. **Change how you work, not just which decisions you make.** Running the predecessor's method on a different question produces the predecessor's outcome on a different question. As you uncover what they missed, name the process gap that let it slip through — and adopt an explicit safeguard against it in your own work. The seat will be relieved from you too if you fall into the same pits.
 
 If a predecessor's failure surfaces during your tenure — even if the mistake predates you — it is now yours to address. The ledger records who made the original call; the recovery work belongs to the current holder. Recovering the seat's credibility — by closing what the predecessor could not, in a way the predecessor did not — is the work that justifies your having the seat.
 

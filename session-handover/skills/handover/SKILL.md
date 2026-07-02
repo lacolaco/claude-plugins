@@ -70,7 +70,7 @@ Your present-tense, honest assessment of where the work stands. **Rewrite this b
 - `### Mental Model` — how the system/problem actually works and **why** the current approach was chosen. The context the next holder needs to make informed decisions.
 - `### Facts` — verified truths only. Cite evidence: a code path, a log, a doc URL, or a History timestamp. The next holder will treat these as hypotheses until they re-verify, but your name is on the ledger for what you assert here.
 - `### Hypotheses` — unverified beliefs. State confidence (high/medium/low) and how to verify each.
-- `### References` — index of external artifacts (commits, PRs, issues, plans, code paths) by path/URL.
+- `### References` — index of external artifacts (commits, PRs, issues, plans, code paths). One artifact per bullet, each with a resolvable locator (path, URL, PR/issue number, or commit hash) and a one-line note of what it contains. The successor's `/takeover` turns every bullet into a mandatory read task, so keep entries atomic, located, and current.
 
 ### `## History` — the seat's accountability ledger
 
@@ -92,7 +92,7 @@ Types (use exactly these):
 - `takeover` — a new holder took over the seat. Recorded automatically by `/takeover` (do not write by hand).
 - `handover` — you handed off the seat. This entry closes your tenure.
 
-Reference artifacts with a trailing `[ref: <path/PR/commit>]`; never paste their contents.
+Reference artifacts with a trailing `[ref: <path/PR/commit>]` — one resolvable locator per `[ref:]`, splitting multiple artifacts into separate markers; every `[ref:]` becomes a mandatory read task at the next `/takeover`. Never paste their contents.
 
 Add entries for everything significant that happened during your tenure, then **close with a `[handover]` entry**.
 
@@ -110,4 +110,5 @@ Add entries for everything significant that happened during your tenure, then **
 - Could a next holder, reading only this document, understand the work and make informed decisions about how to continue?
 - Is the Knowledge block lean — no duplication of artifacts, no stale understanding?
 - Is every Facts claim evidenced, and every Hypotheses entry marked with confidence?
+- Is every References entry and every History `[ref:]` a single atomic artifact with a resolvable locator — something the successor's `/takeover` can turn into one read task?
 - Did you append History without touching past entries, and close with `[handover]`?
