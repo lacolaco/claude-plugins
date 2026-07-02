@@ -1,0 +1,11 @@
+{
+  "name": "llm-wiki",
+  "description": "Knowledge base management skills for the LLM Wiki pattern (Karpathy-style). Provides ingest (project manifest changes → wiki pages), query (cross-project inventory questions), lint (OKF v0.1 conformance, broken links, staleness detection), and sync (re-ingest stale pages). The KB lives at ~/.knowledge/ with a raw/wiki two-layer OKF v0.1 layout.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Suguru Inatomi"
+  },
+  "repository": "https://github.com/lacolaco/claude-plugins",
+  "license": "MIT",
+  "keywords": ["knowledge-base", "llm-wiki", "okf", "ingest", "lint", "karpathy"]
+}

@@ -1,0 +1,220 @@
+{
+  "groups": {
+    "Core protocols / network": [
+      "HTTP",
+      "HTTPS",
+      "TCP",
+      "UDP",
+      "ICMP",
+      "IP",
+      "IPv4",
+      "IPv6",
+      "DNS",
+      "FTP",
+      "SFTP",
+      "SMTP",
+      "IMAP",
+      "POP3",
+      "SSH",
+      "SSL",
+      "TLS",
+      "LDAP",
+      "SAML",
+      "OIDC",
+      "SSO",
+      "JWT"
+    ],
+    "Web platform / standards": [
+      "HTML",
+      "CSS",
+      "DOM",
+      "URL",
+      "URI",
+      "URN",
+      "ARIA",
+      "CORS",
+      "CSP",
+      "SEO",
+      "ASCII",
+      "ANSI",
+      "UTF",
+      "W3C"
+    ],
+    "Web apps / rendering modes": [
+      "SPA",
+      "SSR",
+      "PWA",
+      "CSR",
+      "CDN"
+    ],
+    "JavaScript / modules / bundling": [
+      "JS",
+      "TS",
+      "ESM",
+      "CJS",
+      "DTS",
+      "AMD",
+      "UMD"
+    ],
+    "Data / serialization formats": [
+      "JSON",
+      "YAML",
+      "CSV",
+      "TSV",
+      "XML",
+      "SVG",
+      "PNG",
+      "JPG",
+      "JPEG",
+      "GIF",
+      "PDF",
+      "ZIP",
+      "TAR",
+      "GZ"
+    ],
+    "Database kinds": [
+      "DB",
+      "SQL",
+      "NoSQL",
+      "RDB",
+      "RDS",
+      "CRUD",
+      "CQRS"
+    ],
+    "Security / crypto / auth": [
+      "GPG",
+      "PGP",
+      "RSA",
+      "ECDSA",
+      "PEM",
+      "PIN",
+      "OTP",
+      "TOTP",
+      "HOTP",
+      "IDP"
+    ],
+    "IDs / tokens / identifiers": [
+      "ID",
+      "IDs",
+      "UUID",
+      "ULID"
+    ],
+    "Cloud / infra service short names": [
+      "EC2",
+      "S3",
+      "GCP",
+      "GCS",
+      "VPC",
+      "IAM",
+      "CDK",
+      "WIF",
+      "ADC",
+      "CMS",
+      "ETL",
+      "RSS",
+      "SaaS",
+      "PaaS",
+      "IaaS"
+    ],
+    "Availability / reliability / SLO": [
+      "SLA",
+      "SLI",
+      "SLO",
+      "SLF",
+      "VRT"
+    ],
+    "CI/CD / release management": [
+      "CI",
+      "CD",
+      "PR",
+      "MR",
+      "GA",
+      "LTS"
+    ],
+    "Observability / monitoring / logging": [
+      "OTel",
+      "APM"
+    ],
+    "Testing / TDD / development methods": [
+      "TDD",
+      "BDD",
+      "DDD",
+      "E2E",
+      "IIFE",
+      "MSW",
+      "WCAG"
+    ],
+    "OS / hardware / architecture short names": [
+      "OS",
+      "RAM",
+      "ROM",
+      "SSD",
+      "HDD",
+      "CPU",
+      "GPU",
+      "NIC",
+      "PXE",
+      "UEFI",
+      "BIOS",
+      "EFI",
+      "ARM"
+    ],
+    "Java / JVM / VM family": [
+      "JDK",
+      "JVM",
+      "LLVM",
+      "JIT",
+      "BEAM"
+    ],
+    "AI / machine learning / NLP": [
+      "AI",
+      "ML",
+      "NLP",
+      "LLM",
+      "MCP"
+    ],
+    "UI / UX kinds": [
+      "UI",
+      "UX",
+      "CLI",
+      "GUI",
+      "TTS"
+    ],
+    "Time / units": [
+      "UTC",
+      "TTL",
+      "ms",
+      "ns",
+      "us",
+      "KB",
+      "MB",
+      "GB",
+      "TB"
+    ],
+    "License short names": [
+      "MIT",
+      "GPL",
+      "LGPL",
+      "AGPL",
+      "BSD",
+      "ISC",
+      "EULA",
+      "ISBN",
+      "ISSN",
+      "DOI"
+    ],
+    "Standard / spec short names": [
+      "SDK",
+      "API",
+      "RFC",
+      "OCI",
+      "OSS",
+      "NPM",
+      "SQRC",
+      "SSOT",
+      "RNG",
+      "QR",
+      "PoC"
+    ]
+  }
+}

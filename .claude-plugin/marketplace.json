@@ -28,6 +28,24 @@
       "description": "Read Claude Code responses aloud locally with a different Japanese voice per session. Instructs Claude to deliver mid-turn progress narration via a synchronous Bash call into the say adapter, plus a TodoWrite hook that nudges narration at task transitions. Permission prompts include the workspace name. ON by default; playback volume is adjustable via /session-tts:volume. Engine and models are managed automatically. Apple Silicon only.",
       "version": "0.11.1",
       "source": "./session-tts"
+    },
+    {
+      "name": "tech-writing",
+      "description": "Japanese technical writing norms for books, articles, and documentation. Covers formatting (one sentence per line, footnotes, column headings), paragraph structure (paragraph writing), argumentative rigor, reader cognitive load management, perspective and narration, restraint in rhetoric, LLM-style filler prohibition, and redundancy elimination.",
+      "version": "1.0.0",
+      "source": "./tech-writing"
+    },
+    {
+      "name": "memory-sanitize",
+      "description": "Reproducible Japanese prose quality checker for persistent layers (memory, CLAUDE.md, skill definitions, style guides). Combines textlint-ja rules with custom rules (em-dash prohibition, English word detection, heading separator ban) to enforce writing discipline. No auto-fix — detection only. Requires Node.js (npx).",
+      "version": "1.0.0",
+      "source": "./memory-sanitize"
+    },
+    {
+      "name": "llm-wiki",
+      "description": "Knowledge base management skills for the LLM Wiki pattern (Karpathy-style). Provides ingest (project manifest changes → wiki pages), query (cross-project inventory questions), lint (OKF v0.1 conformance, broken links, staleness detection), and sync (re-ingest stale pages). The KB lives at ~/.knowledge/ with a raw/wiki two-layer OKF v0.1 layout.",
+      "version": "1.0.0",
+      "source": "./llm-wiki"
     }
   ]
 }
