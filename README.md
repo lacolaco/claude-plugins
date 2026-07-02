@@ -10,6 +10,9 @@ Claude Code plugins by lacolaco.
 | [session-handover](./session-handover) | Job-succession handover/takeover: each document is a job seat identified by (project, role); the successor renames it to their own name, audits the inherited handoff report, and continues under fresh accountability |
 | [retrospective](./retrospective) | Structured 6-stage retrospective for tasks, PRs, and incidents |
 | [session-tts](./session-tts) | Read Claude Code responses aloud locally with a different Japanese voice per session. Instructs Claude to deliver mid-turn progress narration via a synchronous Bash call into the say adapter. Permission prompts include the workspace name. ON by default; playback volume is adjustable via `/session-tts:volume`. Engine and voices are managed automatically (Apple Silicon) |
+| [tech-writing](./tech-writing) | Japanese technical writing norms for books, articles, and documentation |
+| [memory-sanitize](./memory-sanitize) | Reproducible Japanese prose quality checker using textlint-ja + custom rules. Detection only, no auto-fix. Requires Node.js |
+| [llm-wiki](./llm-wiki) | Knowledge base management for the LLM Wiki pattern (Karpathy-style). Provides ingest, query, lint, and sync skills |
 
 ## protect-main-branch
 
@@ -317,6 +320,56 @@ After installing, every new session speaks by default with a rotating voice. Use
 ### Voices and licensing
 
 The bundled voices are licensed under [ACML 1.0](https://aivm-specs.aivis-project.com/license/acml/) and downloaded from [AivisHub](https://hub.aivis-project.com/) on first use. ACML 1.0 permits personal use with credit; check the per-voice terms on AivisHub before any other use (commercial use, redistribution, derivative works, etc).
+
+## tech-writing
+
+Japanese technical writing norms for books, articles, and documentation. Provides the `/tech-writing` skill containing normative rules for formatting, paragraph structure, argumentative rigor, reader cognitive load management, perspective and narration, restraint in rhetoric, LLM-style filler prohibition, and redundancy elimination.
+
+### Installation
+
+```
+/plugin marketplace add lacolaco/claude-plugins
+/plugin install tech-writing@lacolaco-plugins
+```
+
+## memory-sanitize
+
+Reproducible Japanese prose quality checker for persistent layers (memory, CLAUDE.md, skill definitions, style guides). Combines textlint-ja rules with custom rules to enforce writing discipline. Detection only — no auto-fix.
+
+### How it works
+
+The `/memory-sanitize` skill runs a two-stage check: first a mechanical textlint pass via `check.sh` (standard textlint-ja rules + four custom rules: `no-english-word`, `no-paren-equals-gloss`, `no-em-dash-ja`, `no-heading-separator`), then an agent-driven prose quality review referencing the `tech-writing` skill.
+
+### Installation
+
+```
+/plugin marketplace add lacolaco/claude-plugins
+/plugin install memory-sanitize@lacolaco-plugins
+```
+
+### Prerequisites
+
+- Node.js (packages fetched via `npx` on first run)
+
+## llm-wiki
+
+Knowledge base management skills for the LLM Wiki pattern (Karpathy-style). The KB lives at `~/.knowledge/` with a raw/wiki two-layer OKF v0.1 layout.
+
+### How it works
+
+Provides four skills:
+
+- **`/kb-ingest`** — project manifest changes → wiki page generation (with mandatory textlint + tech-writing + OKF checks)
+- **`/kb-query`** — cross-project inventory queries answered from the wiki
+- **`/kb-lint`** — OKF v0.1 conformance, broken links, staleness detection (delegates to `kb-lint.sh`)
+- **`/kb-sync`** — re-ingest stale pages identified by `kb-lint`
+
+### Installation
+
+```
+/plugin marketplace add lacolaco/claude-plugins
+/plugin install llm-wiki@lacolaco-plugins
+```
 
 ## License
 

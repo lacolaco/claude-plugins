@@ -31,7 +31,7 @@
     },
     {
       "name": "tech-writing",
-      "description": "Japanese technical writing norms for books, articles, and documentation. Covers formatting, paragraph structure, argumentative rigor, reader cognitive load management, perspective and narration, restraint in rhetoric, LLM-style filler prohibition, and redundancy elimination.",
+      "description": "Japanese technical writing norms for books, articles, and documentation. Covers formatting (one sentence per line, footnotes, column headings), paragraph structure (paragraph writing), argumentative rigor, reader cognitive load management, perspective and narration, restraint in rhetoric, LLM-style filler prohibition, and redundancy elimination.",
       "version": "1.0.0",
       "source": "./tech-writing"
     },
@@ -43,7 +43,7 @@
     },
     {
       "name": "llm-wiki",
-      "description": "Knowledge base management skills for the LLM Wiki pattern (Karpathy-style). Provides ingest, query, lint (OKF v0.1 conformance), and sync. The KB lives at ~/.knowledge/ with a raw/wiki two-layer layout.",
+      "description": "Knowledge base management skills for the LLM Wiki pattern (Karpathy-style). Provides ingest (project manifest changes → wiki pages), query (cross-project inventory questions), lint (OKF v0.1 conformance, broken links, staleness detection), and sync (re-ingest stale pages). The KB lives at ~/.knowledge/ with a raw/wiki two-layer OKF v0.1 layout.",
       "version": "1.0.0",
       "source": "./llm-wiki"
     }
