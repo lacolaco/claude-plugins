@@ -1,6 +1,6 @@
 {
   "name": "retrospective",
-  "description": "Retrospective skill based on a 6-stage process (input → interpretation → planning → action → inspection → output). Surfaces problems bottom-up from outputs and applies fixes top-down from upstream.",
+  "description": "Retrospective centered on auditing every rule and knowledge source in the session context. Enumerates all rules (CLAUDE.md, memory, skills, agents) and knowledge (KB pages, references), classifies each as followed/violated/effective/stale, diagnoses structural causes of failures, and implements fixes.",
   "version": "3.0.0",
   "author": {
     "name": "Suguru Inatomi"

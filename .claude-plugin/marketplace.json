@@ -19,7 +19,7 @@
     },
     {
       "name": "retrospective",
-      "description": "Retrospective skill based on a 6-stage process (input → interpretation → planning → action → inspection → output) to surface problems and opportunities, and apply improvements. Phase 5 now requires mandatory violation diagnostics when an existing rule was violated — 'covered by existing rule' is never a terminal conclusion for a broken rule. Bundles a single retrospective-critic agent invoked once at Submission for adversarial audit across six bias surfaces (including false-closure detection on the search log).",
+      "description": "Retrospective centered on auditing every rule and knowledge source in the session context. Enumerates all rules (CLAUDE.md, memory, skills, agents) and knowledge (KB pages, references), classifies each as followed/violated/effective/stale, diagnoses structural causes of failures, and implements fixes. Bundles a retrospective-critic agent for adversarial audit of the context audit's completeness, classification accuracy, and violation diagnostics.",
       "version": "3.0.0",
       "source": "./retrospective"
     },

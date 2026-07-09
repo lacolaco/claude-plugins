@@ -1,6 +1,6 @@
 ---
 name: retrospective
-description: "Retrospective based on a 6-stage process (input → interpretation → planning → action → inspection → output). Surfaces problems and opportunities bottom-up from outputs and applies fixes top-down from upstream. Use this skill after finishing a task, before creating a PR, or whenever the user says 'retrospective', 'wrap up learnings', or similar."
+description: "Retrospective centered on auditing every rule and knowledge source in the session context. Enumerates all rules (CLAUDE.md, memory, skills, agents) and knowledge (KB pages, references), classifies each as followed/violated/effective/stale, diagnoses structural causes of failures, and implements fixes. Use after finishing a task, before creating a PR, or whenever the user says 'retrospective', 'wrap up learnings', or similar."
 user-invocable: true
 ---
 
@@ -8,7 +8,7 @@ user-invocable: true
 
 Run before a commit or PR is created.
 
-An agent's task execution proceeds through 6 stages.
+This retrospective audits every rule and knowledge source in the session context against what actually happened — not the agent's self-reported narrative of what went well or badly.
 
 ## On the limits of self-report
 
@@ -20,6 +20,8 @@ Critics shift the probability away from append-only failure modes; they do not e
 
 ## The 6 stages
 
+Reference vocabulary for locating where things happened during agent execution.
+
 - **Input**: Receiving instructions, context, skills, CLAUDE.md, memory, tool descriptions, and actively collecting information.
 - **Interpretation**: Reading the meaning, intent, and premises of the input.
 - **Planning**: Task decomposition, ordering, tool selection, scope definition.
@@ -27,46 +29,53 @@ Critics shift the probability away from append-only failure modes; they do not e
 - **Inspection**: Verifying results and judging pass/fail.
 - **Output**: Reporting to the user and deciding what to persist.
 
-## Phase 1: Fact recording
+## Phase 1: Session facts
 
-Record what occurred at each stage in chronological order. Do not mix in interpretation.
+Brief chronological record of what happened. No interpretation.
 
-For Input, record which memories fired (loaded into context) and which did not fire but were relevant — scan the memory directory to identify misses. Memory firing status is a first-class input fact, not an afterthought.
+For Input, inventory every rule and knowledge source in context — CLAUDE.md at each layer, memory entries (scan the memory directory; record which fired and which did not), skills invoked, agents used, KB pages read.
 
-For Output, include the user's reaction (dissatisfaction or satisfaction) — this is the downstream signal Phase 2 lifts upstream.
+For Output, include the user's reaction (dissatisfaction or satisfaction).
 
-## Phase 2: Bottom-up Problem and Opportunity surfacing
+## Phase 2: Context audit
 
-Walk from Output back to Input. At each stage, surface both axes:
+Enumerate every rule and knowledge source from the Phase 1 inventory. Audit each against what actually happened. This is the core of the retrospective.
 
-- **Problems** — failures that occurred. Could this stage have caught the downstream Problem? Is the true cause here, or further upstream?
-- **Opportunities** — no failure occurred, but a better outcome was possible: a faster path, a newly available tool, an unmet ideal.
+### Rules
 
-A retrospective that surfaces only Problems is a defensive workflow. A hole plugged upstream is not plugged again downstream.
+Sources: CLAUDE.md (every loaded layer), memory (feedback entries), skill definitions, agent definitions.
 
-## Phase 3: Keeps
+For each rule:
 
-At each stage, name a success pattern worth keeping.
+- **Followed + effective** → the rule works. Record as a Keep.
+- **Followed + ineffective** → the rule was applied but did not produce the intended outcome. The rule's content needs fixing (wrong prescription, outdated assumption).
+- **Violated** → the rule existed in context but was not applied. Diagnose the structural cause: wrong layer (not loaded at the point of decision), too abstract (did not pattern-match the situation), buried or shadowed (drowned in volume), contradicted (another rule prescribed the opposite), not triggered (activation condition mismatch). A violated rule is a broken rule.
+- **Not relevant** → no action, but note if loaded unnecessarily (scope too broad).
 
-Quality bar: applicable to similar future situations, phrased as a principle, not as a single verified fact.
+### Knowledge
 
-## Phase 4: Top-down Try rollout
+Sources: KB pages, memory (user/project/reference entries), documentation consulted during the session.
 
-For each true cause from Problems and each gap from Opportunities, write a Try from Input downward.
+For each item:
 
-If the cause is cut off upstream, no downstream countermeasure is needed. Layered defense only when the upstream countermeasure is low-confidence.
+- **Used + accurate** → no action.
+- **Used + stale or inaccurate** → update the source.
+- **Available but not used** → was it relevant? If yes, diagnose why it was not consulted.
+- **Needed but unavailable** → gap to fill.
 
-## Phase 5: Improvement implementation flow
+### Gaps
 
-For each Try, judge from Step 1 in order, and stop at the first step that applies.
+Problems or missed opportunities with no covering rule or knowledge. These are candidates for new rules, knowledge, or higher-level fixes (hooks, skills).
+
+## Phase 3: Improvement implementation
+
+For each finding from the audit (violated rules, ineffective rules, stale knowledge, gaps), judge from Step 1 in order and stop at the first step that applies.
 
 1. **Eliminate** — architectural change, automation that removes the work.
 2. **Deterministic guardrail** — lint, typecheck, CI, hook.
 3. **Skill** — multi-step recurring workflow.
 4. **Agent prompt** — specific agent behavior.
-5. **Operate on the existing rule library** (CLAUDE.md, skills, agents, memory) — search for existing rules that cover this Try.
-   - **Violated rule** (a matching rule exists AND the problem it guards against occurred this session): the rule is broken by definition. Diagnose the structural cause of non-firing — wrong layer (not loaded at the point of decision), wrong granularity (too abstract to pattern-match against the concrete situation), buried or shadowed by other rules, or missing trigger (the rule's activation condition does not match the situation that occurred). Then **move**, **fix**, or **escalate to steps 1–4** if the defect is not fixable within the rule library (e.g., a rule that repeatedly fails as prose should become a deterministic guardrail). "Covered by existing rule" is never a terminal conclusion when the rule was violated.
-   - **No matching rule**: prefer **delete** (obsolete rule), **move** (wrong layer/placement), **fix** (wrong content) over **append** (new rule).
+5. **Rule library operation** (CLAUDE.md, skills, agents, memory) — **fix** (wrong content, wrong description, wrong trigger), **move** (wrong layer/placement), **delete** (obsolete), or **append** (new rule — last resort). For a violated rule, the structural diagnosis from Phase 2 dictates the operation. "Covered by existing rule" is never a terminal conclusion when the rule was violated.
 
 As a retrospective outcome, do not modify the global layer (everything under `~/.claude/`). Present global candidates to the user as a separate task.
 
@@ -75,8 +84,8 @@ As a retrospective outcome, do not modify the global layer (everything under `~/
 Invoke `retrospective-critic` (bundled at `agents/retrospective-critic.md`) once. Pass it:
 
 - the workspace rule library entry points
-- the Keeps and Opportunities from Phase 2 / 3
-- the Step 5 search log
+- the Phase 2 audit results (per-rule and per-knowledge classifications)
+- the Phase 3 improvement log
 - the proposed Submission text
 - the workspace writing-style source
 
@@ -86,4 +95,4 @@ Action the verdict's findings this retrospective wherever possible:
 - queue plugin-PR-scoped findings as separate PRs
 - report items requiring external coordination as `needs explicit follow-up`
 
-Present the result to the user as a single readable headline plus a list of actions taken, followed by counters (problems surfaced, opportunities surfaced, deleted, moved, fixed, appended). If uncommitted changes remain, commit and push.
+Present the result to the user as a single readable headline plus a list of actions taken, followed by counters (rules audited, keeps, violations diagnosed, knowledge items audited, gaps found, fixed, moved, deleted, appended). If uncommitted changes remain, commit and push.
