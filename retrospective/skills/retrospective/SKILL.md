@@ -14,7 +14,7 @@ This retrospective audits every rule and knowledge source in the session context
 
 Same-context self-reflection is documented to fail via "degeneration of thought" (Reflexion, Multi-Agent Reflexion): the reflecting model reinforces its original bias rather than finding a new angle.
 
-This skill mitigates that by ending the Submission with one mandatory `retrospective-critic` invocation that audits six bias surfaces in one fresh-context pass.
+This skill mitigates that by ending the Submission with three parallel critic agents, each auditing from an independent context with a distinct adversarial perspective (coverage, classification, remediation).
 
 Critics shift the probability away from append-only failure modes; they do not eliminate it. A low-finding verdict is not proof of thoroughness — only that the critic did not catch the main agent.
 
@@ -81,7 +81,7 @@ As a retrospective outcome, do not modify the global layer (everything under `~/
 
 ## Submission
 
-Invoke `retrospective-critic` (bundled at `agents/retrospective-critic.md`) once. Pass it:
+Invoke three critics **in parallel** (each is a bundled agent under `agents/`). Pass each the same input:
 
 - the workspace rule library entry points
 - the Phase 2 audit results (per-rule and per-knowledge classifications)
@@ -89,7 +89,13 @@ Invoke `retrospective-critic` (bundled at `agents/retrospective-critic.md`) once
 - the proposed Submission text
 - the workspace writing-style source
 
-Action the verdict's findings this retrospective wherever possible:
+| Agent | Perspective |
+|-------|-------------|
+| `critic-coverage` | Did the audit see everything? Source enumeration, gap analysis |
+| `critic-classification` | Did the audit judge correctly? Keep quality, library drift, classification consistency |
+| `critic-remediation` | Did the fixes match the problems? Violation diagnostics, layer placement, style |
+
+Action findings from all three verdicts:
 
 - `delete`, `move`, or `fix` workspace-local rules immediately
 - queue plugin-PR-scoped findings as separate PRs

@@ -19,7 +19,7 @@
     },
     {
       "name": "retrospective",
-      "description": "Retrospective centered on auditing every rule and knowledge source in the session context. Enumerates all rules (CLAUDE.md, memory, skills, agents) and knowledge (KB pages, references), classifies each as followed/violated/effective/stale, diagnoses structural causes of failures, and implements fixes. Bundles a retrospective-critic agent for adversarial audit of the context audit's completeness, classification accuracy, and violation diagnostics.",
+      "description": "Retrospective centered on auditing every rule and knowledge source in the session context. Enumerates all rules (CLAUDE.md, memory, skills, agents) and knowledge (KB pages, references), classifies each as followed/violated/effective/stale, diagnoses structural causes of failures, and implements fixes. Three parallel critic agents (coverage, classification, remediation) adversarially audit the results from independent contexts.",
       "version": "3.0.0",
       "source": "./retrospective"
     },

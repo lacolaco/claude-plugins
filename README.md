@@ -185,6 +185,14 @@ The skill walks through three phases:
 2. **Context audit** — enumerate every rule and knowledge source from the inventory, classify each (followed+effective, followed+ineffective, violated, not relevant; used+accurate, used+stale, available+not used, needed+unavailable), diagnose structural causes of violations, and identify gaps
 3. **Improvement implementation** — for each finding, judge in order: (1) eliminate, (2) deterministic guardrail, (3) skill, (4) agent prompt, (5) rule library operation (fix/move/delete/append) — with structural diagnosis dictating the operation for violated rules
 
+At Submission, three critic agents run in parallel from independent contexts:
+
+| Agent | Perspective |
+|-------|-------------|
+| `critic-coverage` | Did the audit see everything? Source enumeration, gap analysis |
+| `critic-classification` | Did the audit judge correctly? Keep quality, library drift, classification consistency |
+| `critic-remediation` | Did the fixes match the problems? Violation diagnostics, layer placement, style |
+
 All retrospective outcomes are written to workspace-local locations only — the skill does not modify the global `~/.claude/` layer.
 
 ### Installation
