@@ -19,8 +19,8 @@
     },
     {
       "name": "retrospective",
-      "description": "Retrospective skill based on a 6-stage process (input → interpretation → planning → action → inspection → output) to surface problems and opportunities, and apply improvements. Bundles a single retrospective-critic agent invoked once at Submission for adversarial audit across six bias surfaces.",
-      "version": "2.0.0",
+      "description": "Retrospective skill based on a 6-stage process (input → interpretation → planning → action → inspection → output) to surface problems and opportunities, and apply improvements. Phase 5 now requires mandatory violation diagnostics when an existing rule was violated — 'covered by existing rule' is never a terminal conclusion for a broken rule. Bundles a single retrospective-critic agent invoked once at Submission for adversarial audit across six bias surfaces (including false-closure detection on the search log).",
+      "version": "3.0.0",
       "source": "./retrospective"
     },
     {

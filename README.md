@@ -185,7 +185,7 @@ The skill walks through five phases:
 2. **Bottom-up Problem surfacing** — trace Problems from downstream stages (Output, Inspection) up to upstream (Interpretation, Input) to find the true cause
 3. **Keep extraction** — capture reusable success patterns
 4. **Top-down Try rollout** — apply fixes from upstream down; do not plug the same hole twice
-5. **Improvement implementation flow** — for each Try, judge in order: (1) eliminate, (2) deterministic guardrail, (3) skill, (4) agent prompt, (5) workspace `CLAUDE.md` as the last resort
+5. **Improvement implementation flow** — for each Try, judge in order: (1) eliminate, (2) deterministic guardrail, (3) skill, (4) agent prompt, (5) operate on the existing rule library — with mandatory violation diagnostics when a matching rule was violated this session
 
 All retrospective outcomes are written to workspace-local locations only — the skill does not modify the global `~/.claude/` layer.
 

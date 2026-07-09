@@ -41,9 +41,12 @@ Look for missing modalities (a tool not run, a source not read, an axis not meas
 
 ### 4. Search-log refute
 
-For the Step 5 search log, refute "no existing rule covers this — append" by hypothesizing where an existing rule could absorb the finding.
+For the Step 5 search log, refute two failure modes:
 
-List rule paths the main agent did not review or rejected on weak grounds. Default to "plausible miss exists" unless the log reviews every relevant section of the library with substantive reject reasons.
+- **False negative** ("no existing rule covers this — append"): hypothesize where an existing rule could absorb the finding. List rule paths the main agent did not review or rejected on weak grounds.
+- **False closure** ("covered by existing rule — no action needed"): if the problem the Try addresses occurred this session, the existing rule was violated and "covered" is not a valid terminal conclusion. The main agent must have diagnosed why the rule failed to fire and applied a structural fix (move, fix, or escalate to steps 1–4). If the search log shows a match with no violation diagnostic, flag it.
+
+Default to "plausible miss exists" unless the log reviews every relevant section of the library with substantive reject reasons AND every "covered by existing rule" conclusion for a violated rule is paired with a structural diagnosis and fix.
 
 ### 5. Layer audit
 
@@ -66,7 +69,7 @@ Return one structured object:
 - `library_audit`: list of findings (each with `path`, `kind` in {duplicate, conflict, obsolete}, `recommendation` in {delete, move, fix}) or `none`
 - `keep_refinement`: list of Keeps flagged for revision with reason, or `none`
 - `opportunity_surface`: list of additional opportunities by stage, or `none`
-- `search_log_refute`: `confirmed exhaustive` or `plausible miss found: <rule path> — <reason>`
+- `search_log_refute`: `confirmed exhaustive` or `plausible miss found: <rule path> — <reason>` or `false closure found: <rule path> — violated but not diagnosed`
 - `layer_audit`: list of layer mismatches with the recommended layer, or `none`
 - `style_audit`: list of style violations against the proposed Submission text, or `none`
 - `overall`: `pass` if every surface returned `none` (or `confirmed exhaustive` for search log); otherwise `findings present — main agent must action this retrospective or report as needs follow-up`

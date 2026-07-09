@@ -62,7 +62,9 @@ For each Try, judge from Step 1 in order, and stop at the first step that applie
 2. **Deterministic guardrail** — lint, typecheck, CI, hook.
 3. **Skill** — multi-step recurring workflow.
 4. **Agent prompt** — specific agent behavior.
-5. **Operate on the existing rule library** — prefer **delete** (rule no longer needed), **move** (wrong placement), **fix** (rule content is wrong) over **append** (new rule). Re-wording is explicitly out of scope: if a rule fails to fire, the defect is structural, not rhetorical.
+5. **Operate on the existing rule library** — search for existing rules that cover this Try.
+   - **Violated rule** (a matching rule exists AND the problem it guards against occurred this session): the rule is broken by definition. Diagnose the structural cause of non-firing — wrong layer (not loaded at the point of decision), wrong granularity (too abstract to pattern-match against the concrete situation), buried or shadowed by other rules, or missing trigger (the rule's activation condition does not match the situation that occurred). Then **move**, **fix**, or **escalate to steps 1–4** if the defect is not fixable within the rule library (e.g., a rule that repeatedly fails as prose should become a deterministic guardrail). "Covered by existing rule" is never a terminal conclusion when the rule was violated.
+   - **No matching rule**: prefer **delete** (obsolete rule), **move** (wrong layer/placement), **fix** (wrong content) over **append** (new rule).
 
 As a retrospective outcome, do not modify the global layer (everything under `~/.claude/`). Present global candidates to the user as a separate task.
 
