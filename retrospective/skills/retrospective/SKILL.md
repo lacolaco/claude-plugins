@@ -20,7 +20,7 @@ Critics shift the probability away from append-only failure modes; they do not e
 
 ## The 6 stages
 
-- **Input**: Receiving instructions, context, skills, CLAUDE.md, tool descriptions, and actively collecting information.
+- **Input**: Receiving instructions, context, skills, CLAUDE.md, memory, tool descriptions, and actively collecting information.
 - **Interpretation**: Reading the meaning, intent, and premises of the input.
 - **Planning**: Task decomposition, ordering, tool selection, scope definition.
 - **Action**: Tool invocation, file edits, command execution.
@@ -30,6 +30,8 @@ Critics shift the probability away from append-only failure modes; they do not e
 ## Phase 1: Fact recording
 
 Record what occurred at each stage in chronological order. Do not mix in interpretation.
+
+For Input, record which memories fired (loaded into context) and which did not fire but were relevant — scan the memory directory to identify misses. Memory firing status is a first-class input fact, not an afterthought.
 
 For Output, include the user's reaction (dissatisfaction or satisfaction) — this is the downstream signal Phase 2 lifts upstream.
 
@@ -62,7 +64,7 @@ For each Try, judge from Step 1 in order, and stop at the first step that applie
 2. **Deterministic guardrail** — lint, typecheck, CI, hook.
 3. **Skill** — multi-step recurring workflow.
 4. **Agent prompt** — specific agent behavior.
-5. **Operate on the existing rule library** — search for existing rules that cover this Try.
+5. **Operate on the existing rule library** (CLAUDE.md, skills, agents, memory) — search for existing rules that cover this Try.
    - **Violated rule** (a matching rule exists AND the problem it guards against occurred this session): the rule is broken by definition. Diagnose the structural cause of non-firing — wrong layer (not loaded at the point of decision), wrong granularity (too abstract to pattern-match against the concrete situation), buried or shadowed by other rules, or missing trigger (the rule's activation condition does not match the situation that occurred). Then **move**, **fix**, or **escalate to steps 1–4** if the defect is not fixable within the rule library (e.g., a rule that repeatedly fails as prose should become a deterministic guardrail). "Covered by existing rule" is never a terminal conclusion when the rule was violated.
    - **No matching rule**: prefer **delete** (obsolete rule), **move** (wrong layer/placement), **fix** (wrong content) over **append** (new rule).
 
