@@ -48,9 +48,9 @@ Record the originating stage for each cause. This attribution drives Phase 4.
 
 At each stage, name a success pattern worth keeping. Quality bar: applicable to future sessions, phrased as a principle, not a session-specific verified fact.
 
-## Phase 4: Stage-matched remediation
+## Phase 4: Stage-matched remediation design
 
-For each true cause and opportunity from Phase 2, **design and implement** a fix at the stage where the cause lives. A downstream patch for an upstream cause is not a valid fix.
+For each true cause and opportunity from Phase 2, **design** a fix at the stage where the cause lives. A downstream patch for an upstream cause is not a valid fix. Do not implement yet — implementation happens after critic audit in Phase 5.
 
 ### Input — the context was wrong or missing
 
@@ -95,17 +95,6 @@ Two prohibited sinks:
 
 critic-remediation audits both sinks.
 
-### Implementation mandate
-
-**Implement each fix in this session.** Do not propose — execute.
-
-- Knowledge operations: invoke the relevant `kb-*` skill now.
-- Rule operations: edit the file directly (CLAUDE.md, skill, agent).
-- Guardrails: create or modify the configuration.
-- Global layer (`~/.claude/`): the retrospective does not modify the global layer directly. Instead, prepare and submit the change as a prompt for a global-layer-managing agent — specifying the target file, the exact edit (old text → new text), and the rationale. A bare "this belongs in the global layer" with no actionable prompt is a deferred finding, not a prepared one.
-
-Only actions requiring external coordination (user auth, cross-repo, upstream dependency) may be deferred as `needs explicit follow-up`.
-
 ## Submission
 
 **Critic invocation is unconditionally mandatory.** A retrospective that does not invoke all three critics is invalid and must not be presented to the user. There is no exception — not for simple sessions, not for time constraints, not for "no findings to audit." The critics exist because same-context self-reflection is structurally unreliable; skipping them defeats the retrospective's only safeguard against bias.
@@ -126,6 +115,19 @@ Every finding from every critic must receive an explicit disposition. No finding
 - **contested** — the finding is incorrect. State the specific counter-argument: what fact the critic missed or got wrong. "I disagree" without a falsifiable reason is not a counter-argument.
 
 Present a disposition table listing every finding, its disposition, and the evidence or counter-argument. A finding without a disposition is an audit failure.
+
+## Phase 5: Implementation
+
+Implementation begins here — after critics have audited and all findings have dispositions. No fix may be implemented before this phase.
+
+**Implement each fix in this session.** Do not propose — execute.
+
+- Knowledge operations: invoke the relevant `kb-*` skill now.
+- Rule operations: edit the file directly (CLAUDE.md, skill, agent).
+- Guardrails: create or modify the configuration.
+- Global layer (`~/.claude/`): the retrospective does not modify the global layer directly. Instead, prepare and submit the change as a prompt for a global-layer-managing agent — specifying the target file, the exact edit (old text → new text), and the rationale. A bare "this belongs in the global layer" with no actionable prompt is a deferred finding, not a prepared one.
+
+Only actions requiring external coordination (user auth, cross-repo, upstream dependency) may be deferred as `needs explicit follow-up`.
 
 Present the result as a headline plus the disposition table, with counters (problems traced, opportunities surfaced, knowledge operations, rule fixes, keeps, findings actioned, findings contested, items deferred).
 
