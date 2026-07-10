@@ -19,8 +19,8 @@
     },
     {
       "name": "retrospective",
-      "description": "Retrospective centered on auditing every rule and knowledge source in the session context. Enumerates all rules (CLAUDE.md, memory, skills, agents) and knowledge (KB pages, references), classifies each as followed/violated/effective/stale, diagnoses structural causes of failures, and implements fixes. Three parallel critic agents (coverage, classification, remediation) adversarially audit the results from independent contexts.",
-      "version": "3.0.0",
+      "description": "Retrospective grounded in garbage-in-garbage-out: traces problems from Output back to their upstream origin across six stages, then fixes at the stage where the cause lives. Knowledge deficiencies get knowledge fixes, not downstream rule patches. Implements fixes in the current session. Three parallel critic agents (coverage, classification, remediation) adversarially audit the results.",
+      "version": "4.0.0",
       "source": "./retrospective"
     },
     {

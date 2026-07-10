@@ -33,6 +33,10 @@ When writing a Claude Code hook script (`{plugin}/scripts/*.sh` referenced from 
 - Before declaring a fix verified, define what production-path execution proves the fix. For concurrency / cross-session bugs: spawn at least 2 concurrent `claude --plugin-dir` subprocesses with distinct prompts and verify both exit codes plus the observable side effect (e.g. per-session pidfile coexistence, no SIGTERM = exit 143).
 - Never hot-patch `~/.claude/plugins/cache/<plugin>/<version>/` to test a change. The cache is a deployment artifact, not a development surface — `--plugin-dir` is the canonical mechanism.
 
+## Design Changes Require Architecture Diagrams
+
+When a plugin's design is created, rebuilt, or structurally changed, produce an architecture diagram (via `visual-explainer` or equivalent) as part of the deliverable — before code review or PR creation. The diagram is not optional documentation; it is a verification artifact that forces the author to articulate the design coherently.
+
 ## Design Documentation
 
 When summarizing code in `DESIGN.md` / `README.md` / equivalent:
