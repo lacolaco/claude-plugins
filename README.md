@@ -8,7 +8,7 @@ Claude Code plugins by lacolaco.
 |--------|-------------|
 | [protect-main-branch](./protect-main-branch) | Prevent git operations that would modify the main branch (configurable) |
 | [session-handover](./session-handover) | Job-succession handover/takeover: each document is a job seat identified by (project, role); the successor renames it to their own name, audits the inherited handoff report, reads every referenced artifact via mandatory read tasks, and continues under fresh accountability |
-| [retrospective](./retrospective) | Context audit retrospective — enumerate every rule and knowledge source, classify each, diagnose violations |
+| [retrospective](./retrospective) | GIGO-grounded retrospective — trace problems to their upstream origin, fix at the stage where the cause lives |
 | [session-tts](./session-tts) | Read Claude Code responses aloud locally with a different Japanese voice per session. Instructs Claude to deliver mid-turn progress narration via a synchronous Bash call into the say adapter. Permission prompts include the workspace name. ON by default; playback volume is adjustable via `/session-tts:volume`. Engine and voices are managed automatically (Apple Silicon) |
 | [tech-writing](./tech-writing) | Japanese technical writing norms for books, articles, and documentation |
 | [memory-sanitize](./memory-sanitize) | Reproducible Japanese prose quality checker using textlint-ja + custom rules. Detection only, no auto-fix. Requires Node.js |
@@ -175,23 +175,32 @@ To pin handovers to a particular workspace root, create `.handover/` there once 
 
 ## retrospective
 
-Provides the `/retrospective` skill: audits every rule and knowledge source in the session context against what actually happened, instead of relying on the agent's self-reported narrative.
+Provides the `/retrospective` skill: traces problems from Output back to their upstream origin across six stages, then fixes at the stage where the cause lives — grounded in the garbage-in-garbage-out principle.
 
 ### How it works
 
-The skill walks through three phases:
+The skill walks through four phases:
 
-1. **Session facts** — brief chronological record of what happened; inventory every rule and knowledge source in context (CLAUDE.md at each layer, memory entries fired/not-fired, skills, agents, KB pages)
-2. **Context audit** — enumerate every rule and knowledge source from the inventory, classify each (followed+effective, followed+ineffective, violated, not relevant; used+accurate, used+stale, available+not used, needed+unavailable), diagnose structural causes of violations, and identify gaps
-3. **Improvement implementation** — for each finding, judge in order: (1) eliminate, (2) deterministic guardrail, (3) skill, (4) agent prompt, (5) rule library operation (fix/move/delete/append) — with structural diagnosis dictating the operation for violated rules
+1. **Session facts** — brief chronological record; inventory every rule and knowledge source in context
+2. **Bottom-up tracing** — walk from Output back to Input, surface problems and opportunities at each stage, trace each to its originating stage via root cause test
+3. **Keeps** — reusable success patterns at each stage
+4. **Stage-matched remediation** — design and **implement** fixes at the stage where the cause lives:
+   - **Input** causes (missing/stale knowledge) → knowledge operations (`kb-ingest`, revise, reorganize), memory, tool config
+   - **Interpretation** causes (rules misread) → fix/move/delete rules
+   - **Planning** causes → codify as skill or agent
+   - **Action** causes → automate or add guardrails
+   - **Inspection** causes → strengthen verification
+   - **Output** causes → fix reporting or persistence
+
+Fixes are implemented in the current session, not deferred. An Input-stage deficiency is fixed by knowledge operations — not by appending a downstream rule.
 
 At Submission, three critic agents run in parallel from independent contexts:
 
 | Agent | Perspective |
 |-------|-------------|
-| `critic-coverage` | Did the audit see everything? Source enumeration, gap analysis |
-| `critic-classification` | Did the audit judge correctly? Keep quality, library drift, classification consistency |
-| `critic-remediation` | Did the fixes match the problems? Violation diagnostics, layer placement, style |
+| `critic-coverage` | Exhaustiveness — source enumeration, stage coverage, missed problems |
+| `critic-classification` | Correctness — keep quality, stage attribution, library drift |
+| `critic-remediation` | Remediation soundness — stage alignment, implementation verification, style |
 
 All retrospective outcomes are written to workspace-local locations only — the skill does not modify the global `~/.claude/` layer.
 
