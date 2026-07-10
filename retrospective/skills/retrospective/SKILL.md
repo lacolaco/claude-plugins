@@ -84,14 +84,18 @@ Knowledge, memory, or tool access was deficient. No downstream rule compensates 
 
 - Fix reporting, persistence, or communication rules.
 
+### Persistence hierarchy
+
+Memory is a temporary staging area, not a permanent home. A fix that belongs as a formal rule must be distilled into the authoritative layer — CLAUDE.md, skill definition, or agent definition — not left in memory. Memory entries are appropriate only for user/project/reference/feedback facts that have no better home.
+
 ### Implementation mandate
 
 **Implement each fix in this session.** Do not propose — execute.
 
 - Knowledge operations: invoke the relevant `kb-*` skill now.
-- Rule operations: edit the file directly.
+- Rule operations: edit the file directly (CLAUDE.md, skill, agent — not memory as a substitute).
 - Guardrails: create or modify the configuration.
-- Global layer (`~/.claude/`): present to the user as a separate task. The retrospective does not modify the global layer.
+- Global layer (`~/.claude/`): the retrospective does not modify the global layer directly. Instead, prepare and submit the change as a prompt for a global-layer-managing agent — specifying the target file, the exact edit (old text → new text), and the rationale. A bare "this belongs in the global layer" with no actionable prompt is a deferred finding, not a prepared one.
 
 Only actions requiring external coordination (user auth, cross-repo, upstream dependency) may be deferred as `needs explicit follow-up`.
 
@@ -105,6 +109,15 @@ Invoke three critics **in parallel** (bundled under `agents/`):
 | `critic-classification` | Correctness — keep quality, stage attribution, library drift |
 | `critic-remediation` | Remediation soundness — stage alignment, implementation verification, style |
 
-Action the verdict's findings in this session. Present the result as a headline plus actions taken, with counters (problems traced, opportunities surfaced, knowledge operations, rule fixes, keeps, items deferred).
+### Disposition of critic findings
+
+Every finding from every critic must receive an explicit disposition. No finding may be silently dropped.
+
+- **actioned** — the finding was addressed. Cite the evidence: file path edited, skill invoked, classification corrected.
+- **contested** — the finding is incorrect. State the specific counter-argument: what fact the critic missed or got wrong. "I disagree" without a falsifiable reason is not a counter-argument.
+
+Present a disposition table listing every finding, its disposition, and the evidence or counter-argument. A finding without a disposition is an audit failure.
+
+Present the result as a headline plus the disposition table, with counters (problems traced, opportunities surfaced, knowledge operations, rule fixes, keeps, findings actioned, findings contested, items deferred).
 
 If uncommitted changes remain, commit and push.

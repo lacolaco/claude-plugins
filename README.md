@@ -192,7 +192,7 @@ The skill walks through four phases:
    - **Inspection** causes → strengthen verification
    - **Output** causes → fix reporting or persistence
 
-Fixes are implemented in the current session, not deferred. An Input-stage deficiency is fixed by knowledge operations — not by appending a downstream rule.
+Fixes are implemented in the current session, not deferred. An Input-stage deficiency is fixed by knowledge operations — not by appending a downstream rule. Memory is a temporary staging area; fixes that belong as formal rules are distilled into CLAUDE.md or skill definitions. Global-layer changes are prepared as actionable prompts for a global-layer-managing agent.
 
 At Submission, three critic agents run in parallel from independent contexts:
 
@@ -202,7 +202,9 @@ At Submission, three critic agents run in parallel from independent contexts:
 | `critic-classification` | Correctness — keep quality, stage attribution, library drift |
 | `critic-remediation` | Remediation soundness — stage alignment, implementation verification, style |
 
-All retrospective outcomes are written to workspace-local locations only — the skill does not modify the global `~/.claude/` layer.
+Every critic finding requires an explicit disposition: **actioned** (with evidence) or **contested** (with a specific counter-argument). Silent dismissal of findings is structurally blocked.
+
+All workspace-local outcomes are written directly. The skill does not modify the global `~/.claude/` layer but prepares global changes as agent-executable prompts.
 
 ### Installation
 
