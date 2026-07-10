@@ -20,7 +20,7 @@
     {
       "name": "retrospective",
       "description": "Retrospective grounded in garbage-in-garbage-out: traces problems from Output back to their upstream origin across six stages, then fixes at the stage where the cause lives. Knowledge deficiencies get knowledge fixes, not downstream rule patches. Implements fixes in the current session. Critic findings require explicit disposition (actioned or contested) — silent dismissal is structurally blocked.",
-      "version": "4.2.0",
+      "version": "4.3.0",
       "source": "./retrospective"
     },
     {
