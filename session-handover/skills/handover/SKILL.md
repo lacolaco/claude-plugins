@@ -1,6 +1,6 @@
 ---
 name: handover
-description: "Write or update your handover document so the next holder of this job seat can take over your responsibilities. The seat you hold is identified by (project, role) in the document's frontmatter; the document is a handoff report, not a personal diary. Use this skill whenever the user mentions 'handover', 'hand over', 'wrap up', 'end session', 'done for today', 'pass it on', 'save progress', or any phrase suggesting they want to preserve the current work for the next session."
+description: "Write or update your handover document so the next holder of this job seat can take over your responsibilities. The seat you hold is identified by (project, role) in the document's frontmatter; the document is a handoff report, not a personal diary. Use this skill whenever the user mentions 'handover', 'hand over', 'pass it on', or '/handover'. NEVER invoke this skill proactively, autonomously, or as part of completing a task — finishing work, wrapping up, ending a session, or saving progress are NOT triggers for this skill unless the user explicitly asks for a handover."
 user-invocable: true
 allowed-tools: Bash(handover-dir)
 ---

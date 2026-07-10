@@ -1,6 +1,6 @@
 ---
 name: takeover
-description: "Take over a job seat left by a previous holder — adopt responsibility for the work going forward, audit the predecessor's claims before relying on them, and continue under your own name. Every referenced artifact becomes a mandatory read task, drained before any work starts. The predecessor's report is yours to audit, not yours to inherit unexamined. Use this skill whenever the user mentions 'takeover', 'take over', 'resume', 'continue', 'pick up where we left off', or any phrase suggesting they want to continue a previous agent's work."
+description: "Take over a job seat left by a previous holder — adopt responsibility for the work going forward, audit the predecessor's claims before relying on them, and continue under your own name. Every referenced artifact becomes a mandatory read task, drained before any work starts. The predecessor's report is yours to audit, not yours to inherit unexamined. Use this skill whenever the user mentions 'takeover', 'take over', 'pick up where we left off', or '/takeover'. NEVER invoke this skill proactively or autonomously — resuming or continuing work is NOT a trigger for this skill unless the user explicitly asks for a takeover."
 user-invocable: true
 allowed-tools: Bash(handover-dir)
 ---

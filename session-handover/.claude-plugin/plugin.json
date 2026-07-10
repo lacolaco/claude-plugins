@@ -1,7 +1,7 @@
 {
   "name": "session-handover",
   "description": "Job-succession handover/takeover for Claude Code. Each document represents a job seat identified by (project, role) frontmatter and lives at <base>/<holder>.md, where <holder> is the current holder's English first name. /handover writes a holder's handoff report (Knowledge block) and an append-only accountability ledger (History block). /takeover transfers the seat: the file is renamed <predecessor>.md -> <successor>.md, a takeover entry is appended to History, and the successor audits inherited claims before relying on them. Every referenced artifact — References entries and History [ref:] citations alike — is externalized into a mandatory read task and drained before any work starts; reading the inherited citations is not optional. Self/other boundary is preserved by design — the successor does not become the predecessor — so that critical verification of the predecessor's report stays sharp. Predecessor failures that surface during the successor's tenure become the successor's recovery work, per standard business succession discipline. <base> resolves deterministically via the bundled handover-dir command (walks up to the nearest .handover/, falls back to $HOME/.handover). v2.x .claude/handover/ layouts and v3.x description-only frontmatter are auto-migrated.",
-  "version": "5.0.0",
+  "version": "5.1.0",
   "author": {
     "name": "Suguru Inatomi"
   },
