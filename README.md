@@ -183,23 +183,23 @@ The skill walks through four phases:
 
 1. **Session facts** — brief chronological record; inventory every rule and knowledge source in context
 2. **Bottom-up tracing** — walk from Output back to Input, surface problems and opportunities at each stage, trace each to its originating stage via root cause test
-3. **Keeps** — reusable success patterns at each stage
-4. **Stage-matched remediation** — design and **implement** fixes at the stage where the cause lives:
-   - **Input** causes (missing/stale knowledge) → knowledge operations (`kb-ingest`, revise, reorganize), tool config
+3. **Remediation design** — **design** (not implement) fixes at the stage where the cause lives:
+   - **Input** causes (missing/stale knowledge) → knowledge operations (`kb-ingest`, revise, reorganize), project docs, tool config
    - **Interpretation** causes (rules misread) → fix/move/delete rules
    - **Planning** causes → codify as skill or agent
    - **Action** causes → automate or add guardrails
    - **Inspection** causes → strengthen verification
    - **Output** causes → fix reporting or persistence
+4. **Implementation** — executes only after critic audit and disposition. No fix is implemented before critics run.
 
-Fixes are implemented in the current session, not deferred. An Input-stage deficiency is fixed by knowledge operations — not by appending a downstream rule. The retrospective does not write to memory — memory is managed by other workflows. Global-layer changes are prepared as actionable prompts for a global-layer-managing agent.
+The retrospective does not write to memory — memory is managed by other workflows. Global-layer changes are prepared as actionable prompts for a global-layer-managing agent.
 
-At Submission, three critic agents run in parallel from independent contexts:
+At Submission (between Phase 4 and 5), three critic agents run in parallel from independent contexts:
 
 | Agent | Perspective |
 |-------|-------------|
 | `critic-coverage` | Exhaustiveness — source enumeration, stage coverage, missed problems |
-| `critic-classification` | Correctness — keep quality, stage attribution, library drift |
+| `critic-classification` | Correctness — stage attribution, library drift |
 | `critic-remediation` | Remediation soundness — stage alignment, implementation verification, style |
 
 Every critic finding requires an explicit disposition: **actioned** (with evidence) or **contested** (with a specific counter-argument). Silent dismissal of findings is structurally blocked.

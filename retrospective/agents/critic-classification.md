@@ -1,13 +1,13 @@
 ---
 name: critic-classification
-description: "Adversarial audit of the retrospective's stage attributions, keep quality, and library health — verifies that each problem is attributed to its true upstream origin and that keeps are reusable principles. Invoked in parallel with critic-coverage and critic-remediation at Submission."
+description: "Adversarial audit of the retrospective's stage attributions and library health — verifies that each problem is attributed to its true upstream origin. Invoked in parallel with critic-coverage and critic-remediation at Submission."
 tools: Read, Grep, Glob
 model: sonnet
 ---
 
 # critic-classification
 
-You audit whether the retrospective attributed problems to the correct stages and extracted quality keeps. You run in a fresh context with a default-to-refute posture.
+You audit whether the retrospective attributed problems to the correct stages. You run in a fresh context with a default-to-refute posture.
 
 Same-context self-reflection fails via "degeneration of thought" — the reflecting model reinforces its original bias rather than finding a new angle. Your job is to find what the main agent's bias would have suppressed.
 
@@ -22,15 +22,6 @@ Flag:
 - **Shallow attribution** — problem attributed to a downstream stage when the true cause is further upstream. The most common pattern: a problem attributed to Planning or Action when the root cause is Input (the agent planned or acted on wrong/missing knowledge).
 - **Split attribution** — a single root cause attributed to multiple stages when one upstream attribution would subsume all downstream symptoms.
 
-### Keep quality
-
-Refute keeps that are:
-
-- case-specific session facts (e.g. "verified X in this PR")
-- industry-baseline practices (e.g. "wrote tests")
-- insufficiently abstracted — fail the "would this fire in a different session?" test
-- false keeps — a pattern marked as a success when session facts show a problem it should have prevented
-
 ### Library drift
 
 Scan the workspace rule library entry points for:
@@ -44,7 +35,6 @@ Scan the workspace rule library entry points for:
 Return:
 
 - `attribution_errors`: list of problems with corrected stage attribution and reason — or `none`
-- `keeps`: list of keeps flagged for revision with reason — or `none`
 - `library_drift`: list of findings (each with `path`, `kind` in {duplicate, conflict, obsolete}, `recommendation` in {delete, move, fix}) — or `none`
 - `overall`: `pass` if all are `none`; otherwise `findings present`
 
