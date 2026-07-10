@@ -54,10 +54,10 @@ For each true cause and opportunity from Phase 2, **design and implement** a fix
 
 ### Input — the context was wrong or missing
 
-Knowledge, memory, or tool access was deficient. No downstream rule compensates for bad input.
+Knowledge or tool access was deficient. No downstream rule compensates for bad input.
 
 - **Knowledge**: invoke `kb-ingest` to create missing pages, revise stale pages, or reorganize. If a wiki page was consulted but inaccurate, update it now. If needed knowledge was absent, ingest it now.
-- **Memory**: add or revise memories (user/project/reference/feedback).
+- **Project documentation**: if the project has a docs layer that feeds agent context (design docs, ADRs, architecture notes), create or update the relevant document there. Project-specific context belongs in the project, not in the KB.
 - **Tools**: configure MCP servers, hooks, or access.
 
 ### Interpretation — the context was present but misread
@@ -84,16 +84,23 @@ Knowledge, memory, or tool access was deficient. No downstream rule compensates 
 
 - Fix reporting, persistence, or communication rules.
 
-### Persistence hierarchy
+### Remediation targets and prohibited sinks
 
-Memory is a temporary staging area, not a permanent home. "Added to memory" is not a valid fix for a finding that prescribes agent behavior — if the content would fire as a rule in CLAUDE.md, it belongs there, not in memory. Memory entries are appropriate only for user/project/reference/feedback facts that have no better home. The critic-remediation agent audits this and will flag memory misplacements.
+The retrospective writes fixes to authoritative layers only: project CLAUDE.md, project documentation (design docs, ADRs, or any docs directory that serves as agent context), skill definitions, agent definitions, guardrail configurations, or KB pages (for cross-project knowledge). If the project has a documentation layer that feeds agent context, it is a valid — and often correct — remediation target for Input-stage fixes.
+
+Two prohibited sinks:
+
+- **Memory** — the retrospective does not write to memory. Memory is managed by other workflows; it is not a remediation target. Any retrospective action that writes to memory is an unconditional violation.
+- **KB as project substitute** — the KB is an agent-personal cross-project index. Project-specific rules, conventions, or decisions belong in the project's own CLAUDE.md or documentation, not in the KB. Placing project knowledge in the KB removes it from the team's shared artifacts. KB ingestion is appropriate only for cross-project facts that have no single-project home.
+
+critic-remediation audits both sinks.
 
 ### Implementation mandate
 
 **Implement each fix in this session.** Do not propose — execute.
 
 - Knowledge operations: invoke the relevant `kb-*` skill now.
-- Rule operations: edit the file directly (CLAUDE.md, skill, agent — not memory as a substitute).
+- Rule operations: edit the file directly (CLAUDE.md, skill, agent).
 - Guardrails: create or modify the configuration.
 - Global layer (`~/.claude/`): the retrospective does not modify the global layer directly. Instead, prepare and submit the change as a prompt for a global-layer-managing agent — specifying the target file, the exact edit (old text → new text), and the rationale. A bare "this belongs in the global layer" with no actionable prompt is a deferred finding, not a prepared one.
 

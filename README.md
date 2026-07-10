@@ -185,14 +185,14 @@ The skill walks through four phases:
 2. **Bottom-up tracing** — walk from Output back to Input, surface problems and opportunities at each stage, trace each to its originating stage via root cause test
 3. **Keeps** — reusable success patterns at each stage
 4. **Stage-matched remediation** — design and **implement** fixes at the stage where the cause lives:
-   - **Input** causes (missing/stale knowledge) → knowledge operations (`kb-ingest`, revise, reorganize), memory, tool config
+   - **Input** causes (missing/stale knowledge) → knowledge operations (`kb-ingest`, revise, reorganize), tool config
    - **Interpretation** causes (rules misread) → fix/move/delete rules
    - **Planning** causes → codify as skill or agent
    - **Action** causes → automate or add guardrails
    - **Inspection** causes → strengthen verification
    - **Output** causes → fix reporting or persistence
 
-Fixes are implemented in the current session, not deferred. An Input-stage deficiency is fixed by knowledge operations — not by appending a downstream rule. Memory is a temporary staging area; fixes that belong as formal rules are distilled into CLAUDE.md or skill definitions. Global-layer changes are prepared as actionable prompts for a global-layer-managing agent.
+Fixes are implemented in the current session, not deferred. An Input-stage deficiency is fixed by knowledge operations — not by appending a downstream rule. The retrospective does not write to memory — memory is managed by other workflows. Global-layer changes are prepared as actionable prompts for a global-layer-managing agent.
 
 At Submission, three critic agents run in parallel from independent contexts:
 
