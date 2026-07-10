@@ -86,7 +86,7 @@ Knowledge, memory, or tool access was deficient. No downstream rule compensates 
 
 ### Persistence hierarchy
 
-Memory is a temporary staging area, not a permanent home. A fix that belongs as a formal rule must be distilled into the authoritative layer — CLAUDE.md, skill definition, or agent definition — not left in memory. Memory entries are appropriate only for user/project/reference/feedback facts that have no better home.
+Memory is a temporary staging area, not a permanent home. "Added to memory" is not a valid fix for a finding that prescribes agent behavior — if the content would fire as a rule in CLAUDE.md, it belongs there, not in memory. Memory entries are appropriate only for user/project/reference/feedback facts that have no better home. The critic-remediation agent audits this and will flag memory misplacements.
 
 ### Implementation mandate
 
