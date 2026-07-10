@@ -108,6 +108,8 @@ Only actions requiring external coordination (user auth, cross-repo, upstream de
 
 ## Submission
 
+**Critic invocation is unconditionally mandatory.** A retrospective that does not invoke all three critics is invalid and must not be presented to the user. There is no exception — not for simple sessions, not for time constraints, not for "no findings to audit." The critics exist because same-context self-reflection is structurally unreliable; skipping them defeats the retrospective's only safeguard against bias.
+
 Invoke three critics **in parallel** (bundled under `agents/`):
 
 | Agent | Perspective |
