@@ -44,13 +44,9 @@ Walk from Output back to Input. At each stage:
 
 Record the originating stage for each cause. This attribution drives Phase 4.
 
-## Phase 3: Keeps
+## Phase 3: Remediation design
 
-At each stage, name a success pattern worth keeping. Quality bar: applicable to future sessions, phrased as a principle, not a session-specific verified fact.
-
-## Phase 4: Stage-matched remediation design
-
-For each true cause and opportunity from Phase 2, **design** a fix at the stage where the cause lives. A downstream patch for an upstream cause is not a valid fix. Do not implement yet — implementation happens after critic audit in Phase 5.
+For each true cause and opportunity from Phase 2, **design** a fix at the stage where the cause lives. A downstream patch for an upstream cause is not a valid fix. Do not implement yet — implementation happens after critic audit in Phase 4.
 
 ### Input — the context was wrong or missing
 
@@ -104,7 +100,7 @@ Invoke three critics **in parallel** (bundled under `agents/`):
 | Agent | Perspective |
 |-------|-------------|
 | `critic-coverage` | Exhaustiveness — source enumeration, stage coverage, missed problems |
-| `critic-classification` | Correctness — keep quality, stage attribution, library drift |
+| `critic-classification` | Correctness — stage attribution, library drift |
 | `critic-remediation` | Remediation soundness — stage alignment, implementation verification, style |
 
 ### Disposition of critic findings
@@ -116,7 +112,7 @@ Every finding from every critic must receive an explicit disposition. No finding
 
 Present a disposition table listing every finding, its disposition, and the evidence or counter-argument. A finding without a disposition is an audit failure.
 
-## Phase 5: Implementation
+## Phase 4: Implementation
 
 Implementation begins here — after critics have audited and all findings have dispositions. No fix may be implemented before this phase.
 
@@ -129,6 +125,6 @@ Implementation begins here — after critics have audited and all findings have 
 
 Only actions requiring external coordination (user auth, cross-repo, upstream dependency) may be deferred as `needs explicit follow-up`.
 
-Present the result as a headline plus the disposition table, with counters (problems traced, opportunities surfaced, knowledge operations, rule fixes, keeps, findings actioned, findings contested, items deferred).
+Present the result as a headline plus the disposition table, with counters (problems traced, opportunities surfaced, knowledge operations, rule fixes, findings actioned, findings contested, items deferred).
 
 If uncommitted changes remain, commit and push.
