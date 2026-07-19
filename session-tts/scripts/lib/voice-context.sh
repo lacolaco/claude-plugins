@@ -22,15 +22,14 @@
 resolve_speaker() {
   local session_id="$1"
   local data_dir="$HOME/.claude/session-tts"
-  local session_file="$data_dir/sessions/$session_id"
-  local silenced_file="$data_dir/silenced/$session_id"
+  local session_dir="$data_dir/sessions/$session_id"
 
   [ -z "$session_id" ] && return 1
-  [ ! -e "$session_file" ] && return 1
-  [ -e "$silenced_file" ] && return 1
+  [ ! -e "$session_dir/speaker" ] && return 1
+  [ -e "$session_dir/silenced" ] && return 1
 
   local speaker_id
-  speaker_id=$(cat "$session_file" 2>/dev/null || echo "")
+  speaker_id=$(cat "$session_dir/speaker" 2>/dev/null || echo "")
   [ -z "$speaker_id" ] && return 1
 
   printf '%s' "$speaker_id"

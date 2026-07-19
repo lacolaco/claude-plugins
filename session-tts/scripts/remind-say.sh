@@ -27,8 +27,8 @@ session_id=$(printf '%s' "$input" | jq -r '.session_id // empty')
 
 data_dir="$HOME/.claude/session-tts"
 [ -z "$session_id" ] && exit 0
-[ ! -e "$data_dir/sessions/$session_id" ] && exit 0
-[ -e "$data_dir/silenced/$session_id" ] && exit 0
+[ ! -e "$data_dir/sessions/$session_id/speaker" ] && exit 0
+[ -e "$data_dir/sessions/$session_id/silenced" ] && exit 0
 
 plugin_root="${CLAUDE_PLUGIN_ROOT}"
 cmd="bash \"$plugin_root/skills/say/say.sh\" \"<phrase>\""
