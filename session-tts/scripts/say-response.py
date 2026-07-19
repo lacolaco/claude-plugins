@@ -63,15 +63,28 @@ DEFAULT_PLAYBACK_VOLUME = 0.8
 VOLUME_FILE = os.path.expanduser("~/.claude/session-tts/volume")
 
 
+def _resolve_default_volume() -> float:
+    raw = os.environ.get("SESSION_TTS_VOLUME", "")
+    if not raw:
+        return DEFAULT_PLAYBACK_VOLUME
+    try:
+        value = float(raw)
+    except ValueError:
+        return DEFAULT_PLAYBACK_VOLUME
+    if not 0.0 <= value <= 1.0:
+        return DEFAULT_PLAYBACK_VOLUME
+    return value
+
+
 def resolve_playback_volume() -> str:
     try:
         with open(VOLUME_FILE) as f:
             raw = f.read().strip()
         value = float(raw)
     except (FileNotFoundError, ValueError, OSError):
-        return f"{DEFAULT_PLAYBACK_VOLUME:.2f}"
+        return f"{_resolve_default_volume():.2f}"
     if not 0.0 <= value <= 1.0:
-        return f"{DEFAULT_PLAYBACK_VOLUME:.2f}"
+        return f"{_resolve_default_volume():.2f}"
     return f"{value:.2f}"
 
 # Per-session pidfile. Holds the process-group id of the most recent
@@ -81,8 +94,11 @@ def resolve_playback_volume() -> str:
 # utterance always wins and the user never has to wait through stale
 # audio before hearing the new report. Concurrent sessions still have
 # independent pidfiles, so cross-session playback is unaffected.
-PIDFILE_DIR = os.path.expanduser("~/.claude/session-tts/playback")
-PIDFILE = os.path.join(PIDFILE_DIR, SESSION_ID) if SESSION_ID else ""
+PIDFILE = (
+    os.path.expanduser(f"~/.claude/session-tts/sessions/{SESSION_ID}/playback")
+    if SESSION_ID
+    else ""
+)
 
 
 # --- text cleanup ----------------------------------------------------------

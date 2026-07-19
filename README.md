@@ -9,7 +9,7 @@ Claude Code plugins by lacolaco.
 | [protect-main-branch](./protect-main-branch) | Prevent git operations that would modify the main branch (configurable) |
 | [session-handover](./session-handover) | Job-succession handover/takeover: each document is a job seat identified by (project, role); the successor renames it to their own name, audits the inherited handoff report, reads every referenced artifact via mandatory read tasks, and continues under fresh accountability |
 | [retrospective](./retrospective) | GIGO-grounded retrospective — trace problems to their upstream origin, fix at the stage where the cause lives |
-| [session-tts](./session-tts) | Read Claude Code responses aloud locally with a different Japanese voice per session. Instructs Claude to deliver mid-turn progress narration via a synchronous Bash call into the say adapter. Permission prompts include the workspace name. ON by default; playback volume is adjustable via `/session-tts:volume`. Engine and voices are managed automatically (Apple Silicon) |
+| [session-tts](./session-tts) | Read Claude Code responses aloud locally with a different Japanese voice per session. Instructs Claude to deliver mid-turn progress narration via a synchronous Bash call into the say adapter. Permission prompts include the workspace name. ON by default; controllable via `SESSION_TTS_ENABLED` env var; playback volume is adjustable via `/session-tts:volume`. Engine and voices are managed automatically (Apple Silicon) |
 | [tech-writing](./tech-writing) | Japanese technical writing norms for books, articles, and documentation |
 | [memory-sanitize](./memory-sanitize) | Reproducible Japanese prose quality checker using textlint-ja + custom rules. Detection only, no auto-fix. Requires Node.js |
 | [llm-wiki](./llm-wiki) | Knowledge base management for the LLM Wiki pattern (Karpathy-style). Provides ingest, query, lint, and sync skills |
@@ -221,8 +221,8 @@ Reads Claude Code's responses aloud on your local machine. Each Claude Code sess
 
 The plugin subscribes to six hook events:
 
-- **`SessionStart`** — assigns this session a voice from the 3-slot rotation (the assignment is stored at `~/.claude/session-tts/sessions/$session_id` and stays stable across `clear`/`compact` re-fires). It also kicks off a background engine bootstrap that is idempotent: typical re-runs do nothing.
-- **`SessionEnd`** — fires when this session terminates (`/clear`, `/compact`, logout, etc.). SIGTERMs any in-flight playback for this session via the per-session pidfile so audio doesn't outlive the session that started it. Voice assignment and the silence flag are intentionally left in place so the same session_id keeps its voice across `/clear`.
+- **`SessionStart`** — assigns this session a voice from the 3-slot rotation (the assignment is stored at `~/.claude/session-tts/sessions/$session_id/speaker` and stays stable across `clear`/`compact` re-fires). When `SESSION_TTS_ENABLED=0`, the voice is still assigned but the session starts silenced (no context injection, no engine bootstrap, no announcement). It also kicks off a background engine bootstrap that is idempotent: typical re-runs do nothing.
+- **`SessionEnd`** — fires when this session terminates (`/clear`, `/compact`, logout, etc.). SIGTERMs any in-flight playback for this session via the per-session pidfile (`sessions/$session_id/playback`) so audio doesn't outlive the session that started it. The session directory and its contents are intentionally left in place so the same session_id keeps its voice across `/clear`.
 - **`Stop`** — fires when Claude finishes a normal response; speaks `last_assistant_message`
 - **`StopFailure`** — fires when the turn ends due to an API error; speaks `last_assistant_message`
 - **`Notification`** with the `permission_prompt` matcher only — a tool needs approval → speaks 「<workspace>で承認待ちです」, where `<workspace>` is the basename of `cwd` from the hook input (e.g. 「claude-pluginsで承認待ちです」). Falls back to 「承認待ちです。」 if `cwd` is missing. (Other Notification subtypes including `idle_prompt` are intentionally not subscribed.)
@@ -305,7 +305,9 @@ Voice is ON by default in every new session. Use the `/session-tts:tts` skill to
 /session-tts:tts status  # show current state (default)
 ```
 
-The skill toggles `~/.claude/session-tts/silenced/$CLAUDE_CODE_SESSION_ID` and is independent of the voice assignment, so silencing then re-enabling preserves the same voice. Switching to `off` additionally kills any utterance still playing for this session (via the per-session playback pidfile), so the silence takes effect immediately rather than draining the remaining chunk queue. Other concurrent sessions are unaffected. The same flag is honored by `say.sh` (used by both the mid-turn narration call described above and the Stop / Notification hook adapters), so silenced sessions stay silent across every entry point.
+The skill toggles `~/.claude/session-tts/sessions/$CLAUDE_CODE_SESSION_ID/silenced` and is independent of the voice assignment, so silencing then re-enabling preserves the same voice. Switching to `off` additionally kills any utterance still playing for this session (via the per-session playback pidfile), so the silence takes effect immediately rather than draining the remaining chunk queue. Other concurrent sessions are unaffected. The same flag is honored by `say.sh` (used by both the mid-turn narration call described above and the Stop / Notification hook adapters), so silenced sessions stay silent across every entry point.
+
+When `tts on` is called on a session that was silenced at start (via `SESSION_TTS_ENABLED=0`), the skill performs **late activation**: removes the silenced flag, ensures the engine is running, outputs the narration context, and announces "TTSを開始します。" — enabling full TTS mid-session without requiring a restart.
 
 ### Adjust playback volume: `/session-tts:volume`
 
@@ -319,6 +321,43 @@ Every chunk is played through `afplay --volume <coefficient>`. The default coeff
 
 The chosen value is persisted to `~/.claude/session-tts/volume` and read by `say-response.py` for every chunk it plays. The setting is **per-user**, not per-session — adjusting it affects every active and future session, including ones already running (the next chunk picks up the new value). Values outside `[0.0, 1.0]` are rejected and the previous setting (or the built-in default) stays in effect.
 
+### Configuration
+
+All configuration is done via environment variables in Claude Code's `settings.json` (`env` field). Project-level settings override global, so you can set a global default and selectively override per-project. Settings take effect at session start.
+
+```jsonc
+// ~/.claude/settings.json (global default)
+{
+  "env": {
+    "SESSION_TTS_ENABLED": "1",
+    "SESSION_TTS_VOLUME": "0.8"
+  }
+}
+
+// <project>/.claude/settings.json (per-project override)
+{
+  "env": {
+    "SESSION_TTS_ENABLED": "0"
+  }
+}
+```
+
+#### Environment variables
+
+| Variable | Values | Default | Description |
+|----------|--------|---------|-------------|
+| `SESSION_TTS_ENABLED` | `1`/`true`/`yes` or `0`/`false`/`no` | `1` | Controls whether TTS activates on session start. When disabled, the voice is still assigned but the session starts silenced. `/session-tts:tts on` performs late activation. |
+| `SESSION_TTS_VOLUME` | Decimal in `[0.0, 1.0]` | `0.8` | Default `afplay --volume` coefficient. Used when the volume file does not exist. `/session-tts:volume` writes to the file and takes priority. |
+| `SESSION_TTS_ENGINE_URL` | URL | `http://127.0.0.1:10101` | TTS engine HTTP endpoint. For advanced use only (custom engine port or remote engine). |
+
+#### Priority chain
+
+Each configurable aspect has a clear override hierarchy (highest priority first):
+
+- **Activation**: runtime `/session-tts:tts off|on` > `SESSION_TTS_ENABLED` env var > default ON
+- **Volume**: volume file (`/session-tts:volume`) > `SESSION_TTS_VOLUME` env var > hardcoded `0.8`
+- **Engine URL**: `SESSION_TTS_ENGINE_URL` env var > hardcoded `http://127.0.0.1:10101`
+
 ### Installation
 
 ```
@@ -326,7 +365,7 @@ The chosen value is persisted to `~/.claude/session-tts/volume` and read by `say
 /plugin install session-tts@lacolaco-plugins
 ```
 
-After installing, every new session speaks by default with a rotating voice. Use `/session-tts:tts off` to silence a particular session.
+After installing, every new session speaks by default with a rotating voice. Use `/session-tts:tts off` to silence a particular session, or set `SESSION_TTS_ENABLED=0` to start silenced by default.
 
 ### Prerequisites
 

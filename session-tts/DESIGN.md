@@ -131,6 +131,33 @@ model's context. The hook is also configured **synchronous** (no
 `async: true`) because the injected reminder must be in the context
 before the model generates its next text response.
 
+## 3.4 Environment variable configuration
+
+The plugin exposes three user-configurable env vars (set in Claude Code's
+`settings.json` `env` field) and two internal env vars (set by the plugin
+itself during operation).
+
+### User-configurable
+
+| Variable | Read by | Default | Purpose |
+|----------|---------|---------|---------|
+| `SESSION_TTS_ENABLED` | `session-on.sh` | `1` | Activation gate. `0`/`false`/`no` starts the session silenced. |
+| `SESSION_TTS_VOLUME` | `say-response.py` | `0.8` | Default playback volume. Overridden by the volume file when present. |
+| `SESSION_TTS_ENGINE_URL` | `say-response.py` | `http://127.0.0.1:10101` | Engine HTTP endpoint (advanced/debug). |
+
+### Internal (set by the plugin, not for user configuration)
+
+| Variable | Set by | Read by | Purpose |
+|----------|--------|---------|---------|
+| `SESSION_TTS_SPEAKER_ID` | `speak_text()` | `say-response.py` | Voice id for `/audio_query` and `/synthesis`. |
+| `SESSION_TTS_SESSION_ID` | `speak_text()` | `say-response.py` | Session id for per-session pidfile scoping. |
+
+### Priority chain
+
+- **Activation**: runtime `silenced` file > `SESSION_TTS_ENABLED` > default ON
+- **Volume**: volume file > `SESSION_TTS_VOLUME` > hardcoded `0.8`
+- **Engine URL**: `SESSION_TTS_ENGINE_URL` > hardcoded `http://127.0.0.1:10101`
+
 ## 4. Disk layout (`~/.claude/session-tts/`)
 
 State is keyed by user, not by repo, so all sessions share the engine and
@@ -144,23 +171,26 @@ voice models.
 ├── engine.log                    # engine stdout+stderr
 ├── setup.log                     # SessionStart background bootstrap log
 ├── index                         # voice rotation cursor (0..2)
-├── sessions/
-│   └── <session_id>              # contents = assigned speaker_id (style_id)
-├── silenced/
-│   └── <session_id>              # presence file → /session-tts:tts off
 ├── volume                        # user-wide afplay --volume coefficient (0.0..1.0); absent or invalid → default 0.8
-└── playback/
-    └── <session_id>              # current playback's process group id, per session
+└── sessions/
+    └── <session_id>/             # per-session directory (all state colocated)
+        ├── speaker               # assigned speaker_id (style_id)
+        ├── silenced              # presence file → session is muted
+        └── playback              # current playback's process group id
 ```
 
 Invariants:
 
-- A session has a voice **iff** `sessions/<sid>` exists. The file is
-  created exactly once per session, on the first `SessionStart`, and is
-  read by every subsequent hook and skill adapter.
-- A session is silenced **iff** `silenced/<sid>` exists. The two files
-  are independent, so toggling silence does not change voice.
-- `playback/<session_id>` reflects the most-recently-launched
+- A session has a voice **iff** `sessions/<sid>/speaker` exists. The
+  file is created exactly once per session, on the first `SessionStart`,
+  and is read by every subsequent hook and skill adapter.
+- A session is silenced **iff** `sessions/<sid>/silenced` exists. The
+  speaker and silenced files are independent, so toggling silence does
+  not change voice.
+- When `SESSION_TTS_ENABLED=0`, the session starts with both `speaker`
+  and `silenced` present — voice assigned but muted. `/session-tts:tts
+  on` removes `silenced` to perform late activation.
+- `sessions/<sid>/playback` reflects the most-recently-launched
   `say-response.py` process group **for that session**. Different
   sessions have separate pidfiles. All utterance types within a
   session share this one pidfile and preempt uniformly: a new
@@ -188,7 +218,7 @@ Rotation algorithm (`session-on.sh`):
 ```
 prev = read(index_file) or -1
 next = (prev + 1) mod 3
-sessions/<sid> = VOICES[next].style_id
+sessions/<sid>/speaker = VOICES[next].style_id
 index_file = next
 ```
 
@@ -197,10 +227,16 @@ Predictability: if you open three sessions back-to-back, you get all
 three different voices in order. With a hash you might collide.
 
 The rotation happens **only on the first** `SessionStart`. If `clear`
-or `compact` re-fires the hook later, `sessions/<sid>` already exists
-and the script skips both the rotation step and the "TTSを開始します。"
-announcement. That's why `newly_assigned` gates the announcement: we
-do not want to repeat it after every re-fire.
+or `compact` re-fires the hook later, `sessions/<sid>/speaker` already
+exists and the script skips both the rotation step and the
+"TTSを開始します。" announcement. That's why `newly_assigned` gates
+the announcement: we do not want to repeat it after every re-fire.
+
+When `SESSION_TTS_ENABLED=0`, the voice is still assigned (so the
+session has a stable identity), but `sessions/<sid>/silenced` is
+created immediately and the hook exits without context injection,
+engine bootstrap, or announcement. This keeps the voice assignment
+unconditional while letting the activation gate be separate.
 
 ## 6. Engine bootstrap
 
@@ -382,7 +418,7 @@ audible. The pidfile is per-session.
 Implementation uses POSIX process groups and a per-session pidfile:
 
 1. The core reads `SESSION_TTS_SESSION_ID` from env and constructs
-   `PIDFILE = ~/.claude/session-tts/playback/<session_id>`.
+   `PIDFILE = ~/.claude/session-tts/sessions/<session_id>/playback`.
 2. `kill_previous_playback()` reads `PIDFILE` and sends `SIGTERM` to
    the recorded process group (`os.killpg(pgid, signal.SIGTERM)`),
    bringing down the previous python adapter and its `afplay` child
@@ -537,9 +573,15 @@ prompt → todo update on the same turn).
 ### 11.1 `/session-tts:tts <on|off|toggle|status>`
 
 Pure shell adapter at `skills/tts/tts.sh`. Toggles the presence of
-`~/.claude/session-tts/silenced/$CLAUDE_CODE_SESSION_ID`. The skill is
-declared `disable-model-invocation: true` so the model never calls it
-on its own — it is purely user-driven.
+`~/.claude/session-tts/sessions/$CLAUDE_CODE_SESSION_ID/silenced`. The
+skill is declared `disable-model-invocation: true` so the model never
+calls it on its own — it is purely user-driven.
+
+When `tts on` is called on a session that starts silenced (via
+`SESSION_TTS_ENABLED=0`), the adapter performs **late activation**:
+removes the silenced flag, outputs the narration context (same heredoc
+as `session-on.sh`), ensures the engine is running, and announces
+"TTSを開始します。" — enabling full TTS mid-session.
 
 When silencing the session (`off`, or `toggle` flipping to off), the
 adapter reads the session's pidfile and sends `SIGTERM` to that

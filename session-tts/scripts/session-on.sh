@@ -1,12 +1,15 @@
 #!/bin/bash
 # SessionStart hook handler.
 #
-# Two responsibilities:
+# Three responsibilities:
 #   1. Assign a voice to this session (rotating through the configured slots).
-#      The assignment lives at $sessions_dir/$session_id; once written it is
+#      The assignment lives at sessions/$session_id/speaker; once written it is
 #      kept across re-fires (clear/compact) so the voice stays stable for the
 #      lifetime of the session.
-#   2. Make sure the local TTS engine is installed, running, and has the
+#   2. Gate on SESSION_TTS_ENABLED. When disabled (0/false/no), the session
+#      starts silenced (sessions/$session_id/silenced created) and no context,
+#      engine, or announcement is produced.
+#   3. Make sure the local TTS engine is installed, running, and has the
 #      required voice models loaded. Idempotent — typical re-runs do nothing.
 
 set -e
@@ -20,11 +23,37 @@ if [ -z "$session_id" ]; then
 fi
 
 data_dir="$HOME/.claude/session-tts"
-sessions_dir="$data_dir/sessions"
+session_dir="$data_dir/sessions/$session_id"
 index_file="$data_dir/index"
-session_file="$sessions_dir/$session_id"
 
-mkdir -p "$sessions_dir"
+mkdir -p "$session_dir"
+
+# --- pick a voice for this session (only if not already assigned) -----
+newly_assigned=0
+if [ ! -f "$session_dir/speaker" ]; then
+  prev=$(cat "$index_file" 2>/dev/null || echo -1)
+  case "$prev" in ''|*[!0-9-]*) prev=-1 ;; esac
+  next=$(( (prev + 1) % 3 ))
+  case "$next" in
+    0) speaker_id=888753760  ;;  # voice slot 1
+    1) speaker_id=1431611904 ;;  # voice slot 2
+    2) speaker_id=345585728  ;;  # voice slot 3
+    *) speaker_id=888753760  ;;
+  esac
+  echo "$next" > "$index_file"
+  echo "$speaker_id" > "$session_dir/speaker"
+  newly_assigned=1
+fi
+
+# --- SESSION_TTS_ENABLED gate ---
+# When disabled, voice is assigned (identity is stable) but the session
+# starts silenced and no context/engine/announcement is produced.
+case "${SESSION_TTS_ENABLED:-1}" in
+  0|false|no)
+    touch "$session_dir/silenced"
+    exit 0
+    ;;
+esac
 
 # --- inject mid-turn narration guidance into Claude's context ---
 # SessionStart hook stdout is captured by Claude Code as additional context
@@ -87,23 +116,6 @@ Avoid:
 say.sh itself is a no-op if TTS has been silenced via /session-tts:tts off,
 so it's safe to call it without checking silence status.
 EOF
-
-# --- pick a voice for this session (only if not already assigned) -----
-newly_assigned=0
-if [ ! -f "$session_file" ]; then
-  prev=$(cat "$index_file" 2>/dev/null || echo -1)
-  case "$prev" in ''|*[!0-9-]*) prev=-1 ;; esac
-  next=$(( (prev + 1) % 3 ))
-  case "$next" in
-    0) speaker_id=888753760  ;;  # voice slot 1
-    1) speaker_id=1431611904 ;;  # voice slot 2
-    2) speaker_id=345585728  ;;  # voice slot 3
-    *) speaker_id=888753760  ;;
-  esac
-  echo "$next" > "$index_file"
-  echo "$speaker_id" > "$session_file"
-  newly_assigned=1
-fi
 
 # --- engine bootstrap + (optional) ready announcement ---------------------
 # Both run in the background so SessionStart returns instantly. The

@@ -4,11 +4,11 @@
 # playback for this session so audio doesn't outlive the session
 # that started it.
 #
-# Voice assignment (`sessions/<sid>`) and the silence flag
-# (`silenced/<sid>`) are intentionally NOT touched: a /clear leaves
-# the same session_id alive, and the next SessionStart re-fires on
-# the same id — keeping those files makes the voice stable across
-# clear/compact, which is the explicit goal in DESIGN §1.
+# The session directory (`sessions/<sid>/`) and its contents (speaker,
+# silenced) are intentionally NOT touched: a /clear leaves the same
+# session_id alive, and the next SessionStart re-fires on the same id
+# — keeping those files makes the voice stable across clear/compact,
+# which is the explicit goal in DESIGN §1.
 
 set -e
 
@@ -17,7 +17,7 @@ session_id=$(printf '%s' "$input" | jq -r '.session_id // empty')
 
 [ -z "$session_id" ] && exit 0
 
-pidfile="$HOME/.claude/session-tts/playback/$session_id"
+pidfile="$HOME/.claude/session-tts/sessions/$session_id/playback"
 [ -f "$pidfile" ] || exit 0
 
 pgid=$(cat "$pidfile" 2>/dev/null || echo "")
