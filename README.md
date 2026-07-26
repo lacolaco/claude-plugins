@@ -395,7 +395,7 @@ Reproducible Japanese prose quality checker for persistent layers (memory, CLAUD
 
 ### How it works
 
-The `/memory-sanitize` skill runs a two-stage check: first a mechanical textlint pass via `check.sh` (standard textlint-ja rules + four custom rules: `no-english-word`, `no-paren-equals-gloss`, `no-em-dash-ja`, `no-heading-separator`), then an agent-driven prose quality review referencing the `tech-writing` skill.
+The `/memory-sanitize` skill runs a two-stage check: first a mechanical textlint pass via `check.sh` (standard textlint-ja rules + six custom rules: `no-english-word`, `no-paren-equals-gloss`, `no-em-dash-ja`, `no-heading-separator`, `no-space-after-ja-punctuation`, `no-confusable-cyrillic`. The last two live in `scripts/rules-gate/` because they can be driven to zero without editorial judgement, and CI enforces just those via `scripts/check-gate.sh`), then an agent-driven prose quality review referencing the `tech-writing` skill.
 
 ### Installation
 
