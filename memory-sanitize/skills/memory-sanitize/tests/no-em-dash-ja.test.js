@@ -3,10 +3,10 @@
 // 起動: bash <SKILL_DIR>/scripts/test.sh  (npx 経由)
 // 単体: node --test tests/no-em-dash-ja.test.js  (依存解決済みの場合)
 //
-// 検出方針: 日本語の地の文・見出しで em dash `—` (U+2014)、 horizontal bar `―`
-// (U+2015)、 2倍ダッシュ `——` を使うのを禁ずる。 en dash `–` (U+2013) は
-// 範囲表記として許容、 純英語テキスト内の英語複合語 (Curry–Howard など) は
-// 対象外。 コードブロック・バッククォート内は textlint 標準で自動除外。
+// 検出方針: 日本語の地の文・見出しで em dash `—` (U+2014)、horizontal bar `―`
+// (U+2015)、2倍ダッシュ `——` を使うのを禁ずる。en dash `–` (U+2013) は
+// 範囲表記として許容、純英語テキスト内の英語複合語 (Curry–Howard など) は
+// 対象外。コードブロック・バッククォート内は textlint 標準で自動除外。
 
 const nodeTest = require('node:test');
 global.describe = nodeTest.describe;
@@ -30,7 +30,7 @@ tester.run('no-em-dash-ja', rule, {
     // --- en dash は範囲表記として許容 ---
     { text: '範囲を 2020–2025 のように en dash で書く。' },
 
-    // --- 純英語テキスト内の em dash や 英語複合語は対象外 ---
+    // --- 純英語テキスト内の em dash や英語複合語は対象外 ---
     { text: 'See the Curry–Howard correspondence.' },
     { text: 'This is an English sentence — with em dash — and continues.' },
 

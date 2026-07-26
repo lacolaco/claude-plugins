@@ -3,10 +3,10 @@
 // 起動: bash <SKILL_DIR>/scripts/test.sh  (npx 経由)
 // 単体: node --test tests/no-heading-separator.test.js  (依存解決済みの場合)
 //
-// 検出方針: 見出し (`Header` ノード) に区切り線 `─` (U+2500、 罫線) を含めない。
-// 「種別──主題」「主題──概念」 のような二要素詰め込みは禁止し、 単一の
-// 自然な句にする。 em ダッシュなどの他ダッシュ類は no-em-dash-ja 規則で
-// 本文と見出しの両方を網羅するため、 本規則の対象外。
+// 検出方針: 見出し (`Header` ノード) に区切り線 `─` (U+2500、罫線) を含めない。
+// 「種別──主題」「主題──概念」のような二要素詰め込みは禁止し、単一の
+// 自然な句にする。em ダッシュなどの他ダッシュ類は no-em-dash-ja 規則で
+// 本文と見出しの両方を網羅するため、本規則の対象外。
 
 const nodeTest = require('node:test');
 global.describe = nodeTest.describe;

@@ -1,7 +1,7 @@
 // memory-sanitize 独自 rule: 日本語文中の英単語混入を検出する
 //
 // 検出範囲: 日本語文字 (ひらがな・カタカナ・漢字) を含む textlint Str ノードに
-//          出現する連続英字 (2 文字以上)。 純英語の Str ノード (= 日本語文字を
+//          出現する連続英字 (2 文字以上)。純英語の Str ノード (= 日本語文字を
 //          1 文字も含まないテキスト) はルールの目的 (混在検出) の対象外として
 //          スキップする。
 // 除外:
@@ -14,7 +14,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-// 許可一覧の読み込み元 (= スキル同梱の default と、 ユーザー固有の overlay を merge)
+// 許可一覧の読み込み元 (= スキル同梱の default と、ユーザー固有の overlay を merge)
 //   1. スキル同梱 default: <SKILL_DIR>/data/{proper-nouns,acronyms}.json
 //      (= 普遍的に固有名詞・略語として確立した語のみ)
 //   2. ユーザー固有 overlay: $XDG_CONFIG_HOME/memory-sanitize/{proper-nouns,acronyms}.json
@@ -22,10 +22,10 @@ const path = require('node:path');
 //      (= ユーザーのワークスペース・プロジェクト・人物・組織等の workspace 固有識別子)
 //
 // データファイルは JSON (`{"groups": {"<label>": ["Foo", "Bar"]}}` 形式)。
-// 旧 .txt (1 行 1 語、 # でコメント) 形式も読み込めるよう互換維持。
+// 旧 .txt (1 行 1 語、# でコメント) 形式も読み込めるよう互換維持。
 // 許可エントリは単語 ("SQLite") でも phrase ("Conventional Commits") でもよい。
-// phrase の場合は phrase 全体が text に出現したときのみマッチ、 構成単語が単独で
-// 出現しても許可されない (= 「Conventional」 単独で書かれたら違反として検出)。
+// phrase の場合は phrase 全体が text に出現したときのみマッチ、構成単語が単独で
+// 出現しても許可されない (= 「Conventional」単独で書かれたら違反として検出)。
 
 const SKILL_DATA_DIR = path.join(__dirname, '..', '..', 'data');
 const XDG_CONFIG_HOME = process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config');
@@ -35,7 +35,7 @@ function readJsonAllowlist(filepath) {
   if (!fs.existsSync(filepath)) return [];
   const data = JSON.parse(fs.readFileSync(filepath, 'utf8'));
   // 想定: { "groups": { "<label>": ["Foo", "Bar"] } }
-  // また: { "entries": ["Foo", "Bar"] }、 または素のフラット配列 ["Foo", "Bar"] にも対応
+  // また: { "entries": ["Foo", "Bar"] }、または素のフラット配列 ["Foo", "Bar"] にも対応
   if (Array.isArray(data)) return data;
   if (Array.isArray(data.entries)) return data.entries;
   if (data.groups && typeof data.groups === 'object') {
@@ -80,8 +80,8 @@ function escapeRegex(s) {
 //   - proper-nouns.json: 固有名詞 (製品名・サービス名・組織名・ライブラリ名等)
 //   - acronyms.json:     業界横断の頭字語 (HTML/API/GCP/DOM 等)
 // 言語/シェル/ファイル名慣習の予約語 (Dockerfile `COPY`・SQL `JOIN`・HTTP メソッド
-// 等) は本来「コード識別子としての引用」 = バッククォート引用が正規。 検出された
-// 都度バッククォート化するのが規律で、 「念のため」 で許可一覧に詰め込まない。
+// 等) は本来「コード識別子としての引用」 = バッククォート引用が正規。検出された
+// 都度バッククォート化するのが規律で、「念のため」で許可一覧に詰め込まない。
 const ALLOWLIST_ENTRIES = [
   ...loadAllowlist('proper-nouns'),
   ...loadAllowlist('acronyms'),
@@ -98,11 +98,11 @@ module.exports = function (context) {
     [Syntax.Str](node) {
       const raw = getSource(node);
 
-      // 0. 検出範囲は「日本語と英語が混在した Str ノード」 のみ。
+      // 0. 検出範囲は「日本語と英語が混在した Str ノード」のみ。
       //    日本語文字 (ひらがな・カタカナ・漢字・全角句読点を含む CJK 範囲) を
-      //    1 文字も含まないテキストは「英単語混入」 の対象外 (= 純英語の見出し・
-      //    引用・コード片等)。 これにより許可一覧の肥大化や構文除外の場当たり
-      //    対応に頼らず、 ルール本来の目的 (= 日本語文中の英単語混入検出)
+      //    1 文字も含まないテキストは「英単語混入」の対象外 (= 純英語の見出し・
+      //    引用・コード片等)。これにより許可一覧の肥大化や構文除外の場当たり
+      //    対応に頼らず、ルール本来の目的 (= 日本語文中の英単語混入検出)
       //    だけを評価する。
       if (!/[぀-ゟ゠-ヿ一-鿿]/.test(raw)) {
         return;
@@ -111,7 +111,7 @@ module.exports = function (context) {
       let masked = raw;
 
       // 1. 構文的に非 prose 領域 (= 構造的引用) を空白化する。
-      //    順序は「短い anchor を持つ高速判定 → URL/path → 拡張子 → version → email」 の安価順。
+      //    順序は「短い anchor を持つ高速判定 → URL/path → 拡張子 → version → email」の安価順。
       masked = masked.replace(/\[\[[^\]]+\]\]/g, (m) => ' '.repeat(m.length));            // wikilink
       masked = masked.replace(/https?:\/\/[^\s)）]+/g, (m) => ' '.repeat(m.length));      // URL
       masked = masked.replace(/~\/[A-Za-z0-9_.\-\/]+/g, (m) => ' '.repeat(m.length));     // ホームパス
@@ -129,8 +129,8 @@ module.exports = function (context) {
       // 2. 許可エントリ (= phrase 含む) を出現位置でマスク
       //    全大文字略語 (HTML/HTTP/API 等) はここに登録すべき。
       //    旧版は `\b[A-Z][A-Z0-9_]{2,}\b` で 3 文字以上の全大文字略語を機械的に
-      //    素通させていたが、 これは未登録略語まで無検証で許可する裏口になっていた。
-      //    現状は acronyms.txt への明示的登録を唯一の窓口として、 検出規律を担保する。
+      //    素通させていたが、これは未登録略語まで無検証で許可する裏口になっていた。
+      //    現状は acronyms.txt への明示的登録を唯一の窓口として、検出規律を担保する。
       if (ALLOWLIST_REGEX) {
         masked = masked.replace(ALLOWLIST_REGEX, (m) => ' '.repeat(m.length));
       }
