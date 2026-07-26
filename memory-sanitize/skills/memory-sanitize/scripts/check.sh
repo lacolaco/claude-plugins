@@ -6,7 +6,7 @@
 # 使い方:
 #   bash check.sh <target-file> [<target-file> ...]
 #
-# 検査対象は引数で必ず指定。 既定経路は持たない (= スキルの可搬性)。
+# 検査対象は引数で必ず指定。既定経路は持たない (= スキルの可搬性)。
 # 対象判定はエージェントが SKILL.md の手順に従って行う。
 
 set -euo pipefail
@@ -20,8 +20,8 @@ ERROR: 検査対象ファイルが指定されていません
 使い方:
   bash check.sh <target-file> [<target-file> ...]
 
-スキルは既定経路を持ちません。 検査対象はエージェントが自分の実行環境から判断し、
-明示的に引数で渡してください (SKILL.md の「検査対象の決定はエージェントの責務」 節参照)。
+スキルは既定経路を持ちません。検査対象はエージェントが自分の実行環境から判断し、
+明示的に引数で渡してください (SKILL.md の「検査対象の決定はエージェントの責務」節参照)。
 EOF
   exit 2
 fi
@@ -53,6 +53,7 @@ npx --yes \
   -p textlint-rule-no-dropping-the-ra \
   -p textlint-rule-no-hankaku-kana \
   -p textlint-rule-no-mixed-zenkaku-and-hankaku-alphabet \
+  -p textlint-rule-ja-no-space-between-full-width \
   textlint \
     --rule no-mix-dearu-desumasu \
     --rule ja-no-mixed-period \
@@ -66,6 +67,8 @@ npx --yes \
     --rule no-dropping-the-ra \
     --rule no-hankaku-kana \
     --rule no-mixed-zenkaku-and-hankaku-alphabet \
+    --rule ja-no-space-between-full-width \
     --rulesdir "$SKILL_DIR/scripts/rules" \
+    --rulesdir "$SKILL_DIR/scripts/rules-gate" \
     --no-textlintrc \
     "${TARGETS[@]}"
