@@ -4,7 +4,7 @@
 // 単体: node --test tests/no-english-word.test.js  (依存解決済みの場合)
 //
 // textlint-tester は global の describe/it/before/after を期待する Mocha 互換
-// 設計。 node:test の同名 API を global に bind してそのまま起動する。
+// 設計。node:test の同名 API を global に bind してそのまま起動する。
 
 const nodeTest = require('node:test');
 global.describe = nodeTest.describe;
@@ -14,11 +14,11 @@ global.after = nodeTest.after;
 global.beforeEach = nodeTest.beforeEach;
 global.afterEach = nodeTest.afterEach;
 
-// ユーザー overlay (~/.config/memory-sanitize/) の影響を排除し、 スキル同梱の
+// ユーザー overlay (~/.config/memory-sanitize/) の影響を排除し、スキル同梱の
 // data/proper-nouns.txt + data/acronyms.txt のみが許可一覧として効くようにする。
 // 作業ツリー内のパス (例: tests/__no_overlay__/) は誰かが同名ディレクトリを
-// 作った瞬間にオーバーレイを誤って読み込むため、 プロセスごとに一意な空 dir を
-// mkdtempSync で確保し、 そこを指す (= overlay 抑止を偶然ではなく構造的に保証)。
+// 作った瞬間にオーバーレイを誤って読み込むため、プロセスごとに一意な空 dir を
+// mkdtempSync で確保し、そこを指す (= overlay 抑止を偶然ではなく構造的に保証)。
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -79,7 +79,7 @@ tester.run('no-english-word', rule, {
     },
     {
       // phrase の構成単語が単独で出てきたら違反として扱う
-      // (= "Conventional Commits" 全体は許可、 "Conventional" 単独は不許可)
+      // (= "Conventional Commits" 全体は許可、"Conventional" 単独は不許可)
       text: 'これは Conventional な書き方ではない。',
       errors: [{ message: '英単語混入: "Conventional"' }],
     },

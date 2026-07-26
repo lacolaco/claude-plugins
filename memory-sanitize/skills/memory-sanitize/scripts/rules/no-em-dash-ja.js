@@ -8,16 +8,16 @@
 // 除外:
 //   - en dash `–` (U+2013) は範囲表記として許容
 //   - 純英語の Str ノード (日本語文字を含まない) は対象外
-//     例: "Curry–Howard correspondence" や、 英語の地の文中の em dash
+//     例: "Curry–Howard correspondence" や、英語の地の文中の em dash
 //   - バッククォート内コード・コードブロック (textlint の Code/CodeBlock ノードで自動除外)
 
 // 日本語文字 (ひらがな・カタカナ・漢字) を含むかを判定するパターン。
-// 純英語の文 (例: 英語複合語 Curry–Howard、 英文中の em dash) を救うために
-// 「日本語文字を 1 文字でも含む Str ノード」 のみを検査対象とする。
+// 純英語の文 (例: 英語複合語 Curry–Howard、英文中の em dash) を救うために
+// 「日本語文字を 1 文字でも含む Str ノード」のみを検査対象とする。
 const HAS_JA_RE = /[぀-ゟ゠-ヿ一-鿿]/;
 
 // 2倍ダッシュ (em dash 2 連) と単発の em dash / horizontal bar を走査する。
-// 2倍ダッシュを先に検出して位置を記録し、 単発走査では記録済み位置をスキップする。
+// 2倍ダッシュを先に検出して位置を記録し、単発走査では記録済み位置をスキップする。
 const DOUBLE_RE = /——/g;
 const SINGLE_RE = /[—―]/g;
 

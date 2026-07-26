@@ -7,8 +7,8 @@
 #
 # 設計:
 #   - スキル配下に node_modules を持たない (check.sh と同じ非永続原則)
-#   - 一時 dir に package.json を生成して npm install、 NODE_PATH 経由で
-#     require 解決。 終了時に一時 dir を削除。
+#   - 一時 dir に package.json を生成して npm install、NODE_PATH 経由で
+#     require 解決。終了時に一時 dir を削除。
 #   - 2 回目以降は npm のキャッシュ (~/.npm/_cacache/) が効くため高速。
 
 set -euo pipefail
