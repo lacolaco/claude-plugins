@@ -39,9 +39,16 @@ cd "$(dirname "$0")/.."
 RULES_GATE="memory-sanitize/skills/memory-sanitize/scripts/rules-gate"
 CONFIG="scripts/textlintrc.gate.json"
 
-# mapfile is bash 4+; macOS ships bash 3.2, so build the array by splitting.
-targets=($(git ls-files '*.md' '*.sh' '*.js' '*.py' \
-  | grep -v '^session-tts/' | grep -v '/tests/'))
+# mapfile is bash 4+ and macOS ships bash 3.2, so read the list line by line.
+# An unquoted command substitution would word-split on IFS: a tracked path
+# containing a space becomes two array elements, and the readability check
+# below then reports the fragment as deleted. That is a misleading failure,
+# not a silent skip, so it sends whoever hits it after a file that is fine.
+targets=()
+while IFS= read -r f; do
+  targets+=("$f")
+done < <(git ls-files '*.md' '*.sh' '*.js' '*.py' \
+  | grep -v '^session-tts/' | grep -v '/tests/')
 
 # A tracked file missing from the working tree must fail loudly rather than
 # being skipped with a warning.
