@@ -225,7 +225,7 @@ The plugin subscribes to six hook events:
 - **`SessionEnd`** — fires when this session terminates (`/clear`, `/compact`, logout, etc.). SIGTERMs any in-flight playback for this session via the per-session pidfile (`sessions/$session_id/playback`) so audio doesn't outlive the session that started it. The session directory and its contents are intentionally left in place so the same session_id keeps its voice across `/clear`.
 - **`Stop`** — fires when Claude finishes a normal response; speaks `last_assistant_message`
 - **`StopFailure`** — fires when the turn ends due to an API error; speaks `last_assistant_message`
-- **`Notification`** with the `permission_prompt` matcher only — a tool needs approval → speaks 「<workspace>で承認待ちです」, where `<workspace>` is the basename of `cwd` from the hook input (e.g. 「claude-pluginsで承認待ちです」). Falls back to 「承認待ちです。」 if `cwd` is missing. (Other Notification subtypes including `idle_prompt` are intentionally not subscribed.)
+- **`Notification`** with the `permission_prompt` matcher only — a tool needs approval → speaks 「<workspace>で承認待ちです」, where `<workspace>` is the basename of `cwd` from the hook input (e.g. 「claude-pluginsで承認待ちです」). Falls back to 「承認待ちです。」if `cwd` is missing. (Other Notification subtypes including `idle_prompt` are intentionally not subscribed.)
 - **Reminder hooks** (do not speak, only inject context):
   - **`PostToolUse:TodoWrite`** — task transition: nudge to narrate completion → next task
   - **`PreToolUse:Monitor`** — about to watch a long-running background task: nudge to narrate what/why
@@ -285,7 +285,7 @@ Suggested calling moments:
 - **Important findings** — investigation surfaces a notable result
 - **Direction changes** — revising the plan or pivoting the approach
 
-Constraints: under ~100 Japanese characters per call, one phrase per invocation, reported at milestones rather than at each tool call, and always opened with a brief lead-in phrase (枕詞) like 「報告です。」「問題発生です。」「発見です。」「方針転換です。」 so the listener can orient before the body. Not used for the final turn message (Stop already handles that).
+Constraints: under ~100 Japanese characters per call, one phrase per invocation, reported at milestones rather than at each tool call, and always opened with a brief lead-in phrase (枕詞) like 「報告です。」「問題発生です。」「発見です。」「方針転換です。」so the listener can orient before the body. Not used for the final turn message (Stop already handles that).
 
 The plugin nudges Claude toward making this call via two mechanisms:
 

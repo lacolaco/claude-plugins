@@ -37,8 +37,8 @@
     },
     {
       "name": "memory-sanitize",
-      "description": "Reproducible Japanese prose quality checker for persistent layers (memory, CLAUDE.md, skill definitions, style guides). Combines textlint-ja rules with custom rules (em-dash prohibition, English word detection, heading separator ban, no space after Japanese punctuation, Cyrillic homoglyph detection) to enforce writing discipline. No auto-fix — detection only. Requires Node.js (npx).",
-      "version": "1.1.0",
+      "description": "Reproducible Japanese prose quality checker for persistent layers (memory, CLAUDE.md, skill definitions, style guides). Combines textlint-ja rules with custom rules (em-dash prohibition, English word detection, heading separator ban, no space after full-width punctuation or closing brackets, Cyrillic homoglyph detection) to enforce writing discipline. No auto-fix — detection only. Requires Node.js (npx).",
+      "version": "1.2.0",
       "source": "./memory-sanitize"
     },
     {

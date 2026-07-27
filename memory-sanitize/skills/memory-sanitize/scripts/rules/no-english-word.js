@@ -80,7 +80,7 @@ function escapeRegex(s) {
 //   - proper-nouns.json: 固有名詞 (製品名・サービス名・組織名・ライブラリ名等)
 //   - acronyms.json:     業界横断の頭字語 (HTML/API/GCP/DOM 等)
 // 言語/シェル/ファイル名慣習の予約語 (Dockerfile `COPY`・SQL `JOIN`・HTTP メソッド
-// 等) は本来「コード識別子としての引用」 = バッククォート引用が正規。検出された
+// 等) は本来「コード識別子としての引用」= バッククォート引用が正規。検出された
 // 都度バッククォート化するのが規律で、「念のため」で許可一覧に詰め込まない。
 const ALLOWLIST_ENTRIES = [
   ...loadAllowlist('proper-nouns'),
