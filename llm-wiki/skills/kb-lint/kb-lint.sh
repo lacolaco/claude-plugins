@@ -12,7 +12,7 @@ echo "# KB lint report ($(date +%F))"
 echo "wiki: $WIKI"
 echo
 
-# 0. OKF §9.1 conformance（frontmatter 必須 + 非空 type） ---------------------
+# 0. OKF §9.1 conformance（frontmatter 必須 + 非空 type）---------------------
 # OKF v0.1 SPEC §9.1: 非予約 .md は YAML frontmatter を持ち、`type:` が非空。
 # 予約ファイル (index.md / log.md) は §6 / §7 の構造に従う（frontmatter 不要）。
 echo "## 0. OKF §9.1 conformance（非予約ページの frontmatter + type 必須）"
@@ -57,7 +57,7 @@ fi
 echo "- frontmatter 欠落 $n_no_fm / type 欠落 $n_no_type / 予約構造違反 $n_reserved_warn"
 echo
 
-# 1. index 整合性（登録漏れ = orphan 候補） --------------------------------
+# 1. index 整合性（登録漏れ = orphan 候補）--------------------------------
 echo "## 1. index 未登録ページ（orphan 候補）"
 n_files=0; n_missing=0
 while IFS= read -r p; do
