@@ -32,7 +32,7 @@
     {
       "name": "tech-writing",
       "description": "Japanese technical writing norms for books, articles, and documentation. Covers formatting (footnotes, column headings), paragraph structure (paragraph writing), argumentative rigor, reader cognitive load management, perspective and narration, restraint in rhetoric, LLM-style filler prohibition, and redundancy elimination.",
-      "version": "2.0.0",
+      "version": "2.1.0",
       "source": "./tech-writing"
     },
     {
