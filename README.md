@@ -387,7 +387,7 @@ The rules are ported from [a gist by k16shikano](https://gist.github.com/k16shik
 ### Known limitations
 
 - Nothing is said about line breaks inside a paragraph. Drafting produces ordinary paragraphs, but proofreading a manuscript that is already stored one sentence per line is not deterministic: over one such document, three runs preserved the layout once and reflowed the file twice. Say which layout you want when proofreading a manuscript like that.
-- The Japanese description lists `引用ブロック` and `コラム記法` under 整形, but no rule covers blockquotes or a column notation, and the English description lists neither. Both claims come from the source gist and are left in place rather than edited here.
+- The description lists `引用ブロック` and `コラム記法` under 整形, but the section's nine rules cover neither blockquotes nor a column notation; the only `コラム` rule says what a column heading may contain. Both claims come from the source gist and are left in place rather than edited here, and the English description in the manifests mirrors them.
 
 ### Installation
 
