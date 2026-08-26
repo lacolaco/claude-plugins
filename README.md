@@ -382,6 +382,13 @@ The bundled voices are licensed under [ACML 1.0](https://aivm-specs.aivis-projec
 
 Japanese technical writing norms for books, articles, and documentation. Provides the `/tech-writing` skill containing normative rules for formatting, paragraph structure, argumentative rigor, reader cognitive load management, perspective and narration, restraint in rhetoric, LLM-style filler prohibition, and redundancy elimination.
 
+The rules are ported from [a gist by k16shikano](https://gist.github.com/k16shikano/fd287c3133457c4fd8f5601d34aa817d) and are kept faithful to it. The one rule this copy does not carry is 「一文ごとに改行する」, removed in 2.1.2, the first release after 1.0.0, because it split paragraphs into one-line fragments wherever a single newline renders as a line break. One other divergence predates that: the last bullet of 読み手の負荷の管理 completes a sentence the gist leaves truncated.
+
+### Known limitations
+
+- Proofreading a manuscript that is already stored one sentence per line usually reflows it into paragraphs, which is the point of the change, but not every run does: over one such document, two of three runs reflowed it and one left the layout alone. Say which layout you want if the run has to be repeatable.
+- The skill's Japanese description lists `引用ブロック` and `コラム記法` under 整形, but the section's nine rules cover neither blockquotes nor a column notation; the only `コラム` rule says what a column heading may contain. Both claims come from the source gist and are left in place rather than edited here. The English description in the manifests is this repo's own wording, so it lists only what the rules actually cover.
+
 ### Installation
 
 ```
