@@ -382,7 +382,7 @@ The bundled voices are licensed under [ACML 1.0](https://aivm-specs.aivis-projec
 
 Japanese technical writing norms for books, articles, and documentation. Provides the `/tech-writing` skill containing normative rules for formatting, paragraph structure, argumentative rigor, reader cognitive load management, perspective and narration, restraint in rhetoric, LLM-style filler prohibition, and redundancy elimination.
 
-The rules are ported from [a gist by k16shikano](https://gist.github.com/k16shikano/fd287c3133457c4fd8f5601d34aa817d) and are kept faithful to it. The only rule this copy drops is 「一文ごとに改行する」, removed in 2.0.0 because it split paragraphs into one-line fragments wherever a single newline renders as a line break. One other divergence predates that: the last bullet of 冗長の排除 completes a sentence the gist leaves truncated.
+The rules are ported from [a gist by k16shikano](https://gist.github.com/k16shikano/fd287c3133457c4fd8f5601d34aa817d) and are kept faithful to it. The only rule this copy drops is 「一文ごとに改行する」, first released without it in 2.1.2, because it split paragraphs into one-line fragments wherever a single newline renders as a line break. One other divergence predates that: the last bullet of 読み手の負荷の管理 completes a sentence the gist leaves truncated.
 
 ### Known limitations
 
