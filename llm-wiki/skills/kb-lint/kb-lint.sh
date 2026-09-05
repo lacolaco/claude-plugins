@@ -78,7 +78,7 @@ echo
 # 文字列の加工は bash のリテラル置換で行う。sed のブラケット式と \t は BSD と
 # GNU で挙動が違い、マルチバイトの扱いもロケールに依存するため使わない。
 echo "## 1b. index エントリ（OKF §8: description の転記）"
-n_no_desc=0; n_multi=0; n_mismatch=0; n_badfmt=0; n_noline=0
+n_no_desc=0; n_multi=0; n_mismatch=0; n_badfmt=0; n_noline=0; n_block=0; n_dup=0
 while IFS= read -r p; do
   rel="${p#"$WIKI"/}"
   raw="$(awk '
@@ -96,7 +96,7 @@ while IFS= read -r p; do
     "'"*"'") desc="${raw#\'}"; desc="${desc%\'}" ;;
     '"'*|"'"*)
       # 引用符で始まるが終わっていない = 末尾にコメントが付いている。
-      body="${raw%%\"*}"; desc="${raw#\"}"; desc="${desc%%\"*}" ;;
+      desc="${raw#\"}"; desc="${desc%%\"*}" ;;
     *)
       desc="$raw"
       case "$desc" in
@@ -112,7 +112,7 @@ while IFS= read -r p; do
       echo "- description 欠落: $rel"; n_no_desc=$((n_no_desc+1)); continue ;;
     "|"*|">"*)
       echo "- description がブロックスカラー（索引へ転記できない）: $rel"
-      n_no_desc=$((n_no_desc+1)); continue ;;
+      n_block=$((n_block+1)); continue ;;
   esac
   # 一文か。引用の句点（。」）と英語の略語を先に潰してから区切りを数える。
   body="$desc"
@@ -138,6 +138,9 @@ while IFS= read -r p; do
   if [ -z "$line" ]; then
     echo "- index に行頭のエントリが無い: $rel"; n_noline=$((n_noline+1)); continue
   fi
+  if [ "$(printf '%s\n' "$line" | grep -c .)" -gt 1 ]; then
+    echo "- index に同じページのエントリが複数ある: $rel"; n_dup=$((n_dup+1)); continue
+  fi
   case "$line" in
     *"): "*)
       entry="${line#*): }"
@@ -148,7 +151,7 @@ while IFS= read -r p; do
       echo "- index の区切りが \"): \" でない: $rel"; n_badfmt=$((n_badfmt+1)) ;;
   esac
 done < <(find "$WIKI" -type f -name '*.md' ! -name index.md ! -name log.md | sort)
-echo "- description 欠落 $n_no_desc / 複数文 $n_multi / index 不一致 $n_mismatch / index 書式違反 $n_badfmt / index 行なし $n_noline"
+echo "- description 欠落 $n_no_desc / ブロックスカラー $n_block / 複数文 $n_multi / index 不一致 $n_mismatch / index 書式違反 $n_badfmt / index 行なし $n_noline / index 重複 $n_dup"
 echo
 
 # 2. リンク切れ・未作成ページ ----------------------------------------------
@@ -212,5 +215,5 @@ echo "- 計 $n_stale 件（source_paths 未設定スキップ: $n_no_src 件）"
 echo
 
 echo "---"
-echo "summary: OKF frontmatter 欠落 $n_no_fm / OKF type 欠落 $n_no_type / 予約構造違反 $n_reserved_warn / description 欠落 $n_no_desc / description 複数文 $n_multi / index 不一致 $n_mismatch / index 書式違反 $n_badfmt / index 行なし $n_noline / 未登録 $n_missing / リンク切れ $n_dead / 陳腐化疑い $n_stale"
+echo "summary: OKF frontmatter 欠落 $n_no_fm / OKF type 欠落 $n_no_type / 予約構造違反 $n_reserved_warn / description 欠落 $n_no_desc / description ブロックスカラー $n_block / description 複数文 $n_multi / index 不一致 $n_mismatch / index 書式違反 $n_badfmt / index 行なし $n_noline / index 重複 $n_dup / 未登録 $n_missing / リンク切れ $n_dead / 陳腐化疑い $n_stale"
 echo "（schema 準拠: 本検査は提案のみ。修正は skill/人間が判断する）"
