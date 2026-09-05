@@ -72,6 +72,37 @@ n_index=$(grep -cE '^- \[' "$INDEX" || true)
 echo "- ページ $n_files / index 項目 $n_index / 未登録 $n_missing"
 echo
 
+# 1b. index エントリと description の整合（OKF §8） ------------------------
+# OKF §8: index のエントリは、リンク先の frontmatter description を載せる。
+# description は §4.1 で「A single sentence」。よって index 行も一文である。
+echo "## 1b. index エントリ（OKF §8: description の転記）"
+n_no_desc=0; n_multi=0; n_mismatch=0
+while IFS= read -r p; do
+  rel="${p#"$WIKI"/}"
+  desc="$(awk '/^---$/{n++; next} n==1 && /^description:/{sub(/^description:[ \t]*/,""); print; exit}' "$p")"
+  if [ -z "$desc" ]; then
+    echo "- description 欠落: $rel"
+    n_no_desc=$((n_no_desc+1))
+    continue
+  fi
+  # 一文か（文末以外に「。」を含まない）
+  body="${desc%。}"
+  case "$body" in
+    *。*) echo "- description が複数文: $rel"; n_multi=$((n_multi+1)) ;;
+  esac
+  # index 行の説明が description と一致するか
+  line="$(grep -F "($rel)" "$INDEX" | head -1)"
+  if [ -n "$line" ]; then
+    entry="${line#*): }"
+    if [ "$entry" != "$desc" ]; then
+      echo "- index が description と不一致: $rel"
+      n_mismatch=$((n_mismatch+1))
+    fi
+  fi
+done < <(find "$WIKI" -type f -name '*.md' ! -name index.md ! -name log.md | sort)
+echo "- description 欠落 $n_no_desc / 複数文 $n_multi / index 不一致 $n_mismatch"
+echo
+
 # 2. リンク切れ・未作成ページ ----------------------------------------------
 echo "## 2. リンク切れ（相対 .md リンク先が無い = リンク切れ or 未作成 ingest 候補）"
 n_dead=0
