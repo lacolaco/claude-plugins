@@ -12,7 +12,6 @@ Claude Code plugins by lacolaco.
 | [session-tts](./session-tts) | Read Claude Code responses aloud locally with a different Japanese voice per session. Instructs Claude to deliver mid-turn progress narration via a synchronous Bash call into the say adapter. Permission prompts include the workspace name. ON by default; controllable via `SESSION_TTS_ENABLED` env var; playback volume is adjustable via `/session-tts:volume`. Engine and voices are managed automatically (Apple Silicon) |
 | [tech-writing](./tech-writing) | Japanese technical writing norms for books, articles, and documentation |
 | [memory-sanitize](./memory-sanitize) | Reproducible Japanese prose quality checker using textlint-ja + custom rules. Detection only, no auto-fix. Requires Node.js |
-| [llm-wiki](./llm-wiki) | Knowledge base management for the LLM Wiki pattern (Karpathy-style). Provides ingest, query, lint, and sync skills |
 
 ## protect-main-branch
 
@@ -184,7 +183,7 @@ The skill walks through four phases:
 1. **Session facts** — brief chronological record; inventory every rule and knowledge source in context
 2. **Bottom-up tracing** — walk from Output back to Input, surface problems and opportunities at each stage, trace each to its originating stage via root cause test
 3. **Remediation design** — **design** (not implement) fixes at the stage where the cause lives:
-   - **Input** causes (missing/stale knowledge) → knowledge operations (`kb-ingest`, revise, reorganize), project docs, tool config
+   - **Input** causes (missing/stale knowledge) → knowledge operations (ingest, revise, reorganize), project docs, tool config
    - **Interpretation** causes (rules misread) → fix/move/delete rules
    - **Planning** causes → codify as skill or agent
    - **Action** causes → automate or add guardrails
@@ -414,26 +413,6 @@ The `/memory-sanitize` skill runs a two-stage check: first a mechanical textlint
 ### Prerequisites
 
 - Node.js (packages fetched via `npx` on first run)
-
-## llm-wiki
-
-Knowledge base management skills for the LLM Wiki pattern (Karpathy-style). The KB lives at `~/.knowledge/` with a raw/wiki two-layer OKF v0.1 layout.
-
-### How it works
-
-Provides four skills:
-
-- **`/kb-ingest`** — project manifest changes → wiki page generation (with mandatory textlint + tech-writing + OKF checks)
-- **`/kb-query`** — cross-project inventory queries answered from the wiki
-- **`/kb-lint`** — OKF v0.1 conformance, broken links, staleness detection (delegates to `kb-lint.sh`)
-- **`/kb-sync`** — re-ingest stale pages identified by `kb-lint`
-
-### Installation
-
-```
-/plugin marketplace add lacolaco/claude-plugins
-/plugin install llm-wiki@lacolaco-plugins
-```
 
 ## License
 

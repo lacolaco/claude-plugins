@@ -20,7 +20,7 @@
     {
       "name": "retrospective",
       "description": "Retrospective grounded in garbage-in-garbage-out: traces problems from Output back to their upstream origin across six stages, then fixes at the stage where the cause lives. Knowledge deficiencies get knowledge fixes, not downstream rule patches. Implements fixes in the current session. Critic findings require explicit disposition (actioned or contested) — silent dismissal is structurally blocked.",
-      "version": "5.0.0",
+      "version": "5.0.1",
       "source": "./retrospective"
     },
     {
@@ -40,12 +40,6 @@
       "description": "Reproducible Japanese prose quality checker for persistent layers (memory, CLAUDE.md, skill definitions, style guides). Combines textlint-ja rules with custom rules (em-dash prohibition, English word detection, heading separator ban, no space after Japanese punctuation, Cyrillic homoglyph detection) to enforce writing discipline. No auto-fix — detection only. Requires Node.js (npx).",
       "version": "1.1.0",
       "source": "./memory-sanitize"
-    },
-    {
-      "name": "llm-wiki",
-      "description": "Knowledge base management skills for the LLM Wiki pattern (Karpathy-style). Provides ingest (project manifest changes → wiki pages), query (cross-project inventory questions), lint (OKF v0.1 conformance, broken links, staleness detection), and sync (re-ingest stale pages). The KB lives at ~/.knowledge/ with a raw/wiki two-layer OKF v0.1 layout.",
-      "version": "1.0.0",
-      "source": "./llm-wiki"
     }
   ]
 }

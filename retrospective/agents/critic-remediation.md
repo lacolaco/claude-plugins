@@ -49,7 +49,7 @@ Acceptable deferrals:
 - Actions requiring external coordination (user auth, cross-repo, upstream dependency)
 
 Unacceptable deferrals:
-- Knowledge operations that could have been performed via `kb-ingest` / `kb-sync`
+- Knowledge operations that could have been performed against the knowledge base (ingesting a missing page, refreshing a stale one)
 - Rule edits in workspace-local CLAUDE.md, skills, agents
 - Hook or configuration changes within the workspace
 
