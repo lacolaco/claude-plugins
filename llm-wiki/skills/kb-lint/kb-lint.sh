@@ -74,24 +74,40 @@ echo
 
 # 1b. index エントリと description の整合（OKF §8） ------------------------
 # OKF §8: index のエントリは、リンク先の frontmatter description を載せる。
-# description は §4.1 で「A single sentence」。よって index 行も一文である。
+# description は §4.1 で "A single sentence"。よって index 行も一文である。
 echo "## 1b. index エントリ（OKF §8: description の転記）"
 n_no_desc=0; n_multi=0; n_mismatch=0
 while IFS= read -r p; do
   rel="${p#"$WIKI"/}"
-  desc="$(awk '/^---$/{n++; next} n==1 && /^description:/{sub(/^description:[ \t]*/,""); print; exit}' "$p")"
-  if [ -z "$desc" ]; then
-    echo "- description 欠落: $rel"
-    n_no_desc=$((n_no_desc+1))
-    continue
-  fi
-  # 一文か（文末以外に「。」を含まない）
-  body="${desc%。}"
-  case "$body" in
-    *。*) echo "- description が複数文: $rel"; n_multi=$((n_multi+1)) ;;
+  # frontmatter 内の description を取り、引用符と前後の空白を落とす。
+  # ブロックスカラー（| や >）は一文の要求を満たせないため欠落として扱う。
+  desc="$(awk '
+    /^---$/ { n++; next }
+    n==1 && /^description:/ {
+      sub(/^description:[ \t]*/, "")
+      sub(/[ \t]+$/, "")
+      if ($0 ~ /^["\047]/) { sub(/^["\047]/, ""); sub(/["\047]$/, "") }
+      print; exit
+    }
+    n>=2 { exit }
+  ' "$p")"
+  case "$desc" in
+    ""|"|"*|">"*)
+      echo "- description 欠落: $rel"
+      n_no_desc=$((n_no_desc+1))
+      continue ;;
   esac
-  # index 行の説明が description と一致するか
-  line="$(grep -F "($rel)" "$INDEX" | head -1)"
+  # 一文か。かぎ括弧の中は引用なので外し、文末の区切り（。または .）を1つ落とし、
+  # 残りに区切りが無いことを見る。
+  body="$(printf '%s' "$desc" | sed 's/「[^」]*」//g')"
+  body="${body%。}"; body="${body%.}"
+  case "$body" in
+    *。*|*.\ *)
+      echo "- description が複数文: $rel"
+      n_multi=$((n_multi+1)) ;;
+  esac
+  # index 行の説明が description と一致するか。行頭のリンクだけを見る。
+  line="$(grep -E "^- \[[^]]*\]\($(printf '%s' "$rel" | sed 's/[.[\*^$/]/\\&/g')\): " "$INDEX" || true)"
   if [ -n "$line" ]; then
     entry="${line#*): }"
     if [ "$entry" != "$desc" ]; then
@@ -164,5 +180,5 @@ echo "- 計 $n_stale 件（source_paths 未設定スキップ: $n_no_src 件）"
 echo
 
 echo "---"
-echo "summary: OKF frontmatter 欠落 $n_no_fm / OKF type 欠落 $n_no_type / 予約構造違反 $n_reserved_warn / 未登録 $n_missing / リンク切れ $n_dead / 陳腐化疑い $n_stale"
+echo "summary: OKF frontmatter 欠落 $n_no_fm / OKF type 欠落 $n_no_type / 予約構造違反 $n_reserved_warn / description 欠落 $n_no_desc / description 複数文 $n_multi / index 不一致 $n_mismatch / 未登録 $n_missing / リンク切れ $n_dead / 陳腐化疑い $n_stale"
 echo "（schema 準拠: 本検査は提案のみ。修正は skill/人間が判断する）"
