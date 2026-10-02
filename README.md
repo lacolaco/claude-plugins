@@ -9,7 +9,6 @@ Claude Code plugins by lacolaco.
 | [protect-main-branch](./protect-main-branch) | Prevent git operations that would modify the main branch (configurable) |
 | [session-handover](./session-handover) | Job-succession handover/takeover: each document is a job seat identified by (project, role); the successor renames it to their own name, audits the inherited handoff report, reads every referenced artifact via mandatory read tasks, and continues under fresh accountability |
 | [session-tts](./session-tts) | Read Claude Code responses aloud locally with a different Japanese voice per session. Instructs Claude to deliver mid-turn progress narration via a synchronous Bash call into the say adapter. Permission prompts include the workspace name. ON by default; controllable via `SESSION_TTS_ENABLED` env var; playback volume is adjustable via `/session-tts:volume`. Engine and voices are managed automatically (Apple Silicon) |
-| [tech-writing](./tech-writing) | Japanese technical writing norms for books, articles, and documentation |
 
 ## protect-main-branch
 
@@ -334,24 +333,6 @@ After installing, every new session speaks by default with a rotating voice. Use
 ### Voices and licensing
 
 The bundled voices are licensed under [ACML 1.0](https://aivm-specs.aivis-project.com/license/acml/) and downloaded from [AivisHub](https://hub.aivis-project.com/) on first use. ACML 1.0 permits personal use with credit; check the per-voice terms on AivisHub before any other use (commercial use, redistribution, derivative works, etc).
-
-## tech-writing
-
-Japanese technical writing norms for books, articles, and documentation. Provides the `/tech-writing` skill containing normative rules for formatting, paragraph structure, argumentative rigor, reader cognitive load management, perspective and narration, restraint in rhetoric, LLM-style filler prohibition, and redundancy elimination.
-
-The rules are ported from [a gist by k16shikano](https://gist.github.com/k16shikano/fd287c3133457c4fd8f5601d34aa817d) and are kept faithful to it. The one rule this copy does not carry is 「一文ごとに改行する」, removed in 2.1.2, the first release after 1.0.0, because it split paragraphs into one-line fragments wherever a single newline renders as a line break. One other divergence predates that: the last bullet of 読み手の負荷の管理 completes a sentence the gist leaves truncated.
-
-### Known limitations
-
-- Proofreading a manuscript that is already stored one sentence per line usually reflows it into paragraphs, which is the point of the change, but not every run does: over one such document, two of three runs reflowed it and one left the layout alone. Say which layout you want if the run has to be repeatable.
-- The skill's Japanese description lists `引用ブロック` and `コラム記法` under 整形, but the section's nine rules cover neither blockquotes nor a column notation; the only `コラム` rule says what a column heading may contain. Both claims come from the source gist and are left in place rather than edited here. The English description in the manifests is this repo's own wording, so it lists only what the rules actually cover.
-
-### Installation
-
-```
-/plugin marketplace add lacolaco/claude-plugins
-/plugin install tech-writing@lacolaco-plugins
-```
 
 ## License
 
