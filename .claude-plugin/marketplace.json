@@ -34,12 +34,6 @@
       "description": "Japanese technical writing norms for books, articles, and documentation. Covers formatting (footnotes, column headings), paragraph structure (paragraph writing), argumentative rigor, reader cognitive load management, perspective and narration, restraint in rhetoric, LLM-style filler prohibition, and redundancy elimination.",
       "version": "2.1.2",
       "source": "./tech-writing"
-    },
-    {
-      "name": "memory-sanitize",
-      "description": "Reproducible Japanese prose quality checker for persistent layers (memory, CLAUDE.md, skill definitions, style guides). Combines textlint-ja rules with custom rules (em-dash prohibition, English word detection, heading separator ban, no space after Japanese punctuation, Cyrillic homoglyph detection) to enforce writing discipline. No auto-fix — detection only. Requires Node.js (npx).",
-      "version": "1.1.0",
-      "source": "./memory-sanitize"
     }
   ]
 }

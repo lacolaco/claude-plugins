@@ -1,7 +1,0 @@
-{
-  "plugins": {
-    "@textlint/text": {
-      "extensions": [".sh", ".js", ".py"]
-    }
-  }
-}
