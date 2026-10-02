@@ -7,7 +7,6 @@ Claude Code plugins by lacolaco.
 | Plugin | Description |
 |--------|-------------|
 | [protect-main-branch](./protect-main-branch) | Prevent git operations that would modify the main branch (configurable) |
-| [session-handover](./session-handover) | Job-succession handover/takeover: each document is a job seat identified by (project, role); the successor renames it to their own name, audits the inherited handoff report, reads every referenced artifact via mandatory read tasks, and continues under fresh accountability |
 | [session-tts](./session-tts) | Read Claude Code responses aloud locally with a different Japanese voice per session. Instructs Claude to deliver mid-turn progress narration via a synchronous Bash call into the say adapter. Permission prompts include the workspace name. ON by default; controllable via `SESSION_TTS_ENABLED` env var; playback volume is adjustable via `/session-tts:volume`. Engine and voices are managed automatically (Apple Silicon) |
 
 ## protect-main-branch
@@ -83,91 +82,6 @@ The allowlist accepts any subcommand, including `commit` and `push` — the plug
 ### Prerequisites
 
 - `jq` must be installed
-
-## session-handover
-
-Carries work across Claude Code sessions as **job succession**, not as a reincarnated identity. The document is a handoff report and an accountability ledger; the successor audits the predecessor's claims before relying on them, and continues under their own name.
-
-- **`/handover`** — write or update your handover document so the next holder of this seat can take it over
-- **`/takeover`** — take over a job seat: rename the document to your own name, audit the prior holder's report, read every referenced artifact before doing any work, and continue under fresh accountability
-
-### Conceptual frame: succession, not reincarnation
-
-This plugin previously (v3.x) modeled handover as **reincarnation**: a successor adopted the predecessor's identity and "inherited their mind". In practice that frame collapsed the self/other boundary that critical verification depends on — successors treated the predecessor's Knowledge as their own past judgments and stopped questioning them.
-
-v4 reframes the relationship as **job succession with accountability transfer**:
-
-- The successor is **not** the predecessor. They take the seat under their own name.
-- The Knowledge block is the prior holder's handoff report — useful, but to be **audited**, not inherited. Until the successor has verified a claim, anything they build on it is on their own account.
-- If a predecessor's failure surfaces during the successor's tenure — even one that predates them — it is now the successor's to address. The ledger records who made the original call; the recovery work belongs to the current holder. This is standard business succession discipline.
-- **The successor's starting posture is that the predecessor underperformed.** A successor is needed only because the predecessor could not bring the work to a finished state within their tenure — that is a structural fact, not a personal judgment. The audit is not a courtesy; it is the successor's job to find what the predecessor missed, got wrong, or could not solve. A clean-looking handoff is a signal to look harder, not to relax.
-- **The successor must work differently from the predecessor and recover the seat's credibility.** Repeating the predecessor's approach produces the predecessor's outcome — the successor will hit the same walls and be relieved the same way. The seat has lost trust because the predecessor could not deliver; restoring that trust is part of the successor's job, not a side concern. The successor identifies what about the predecessor's *method* failed (premature certainty, skipped verification, narrow framing, anchoring on a wrong model) and adopts explicit safeguards against repeating it.
-
-### Job seats and storage
-
-Each handover document represents one **job seat** — identified by `project` and `role` in its YAML frontmatter — and lives at `<base>/<holder>.md` where `<holder>` is the current holder's lowercase English first name. Multiple seats coexist in `<base>/` when several agents work in parallel; each seat is one file owned by its current holder.
-
-- A new subject minting a seat picks an English first name not already taken in `<base>/`, and writes the seat's (`project`, `role`, `description`) frontmatter for the first time.
-- A successor taking over an existing seat picks their **own** name (also not already taken) and **renames the predecessor's file** (`<predecessor>.md` → `<successor>.md`). The frontmatter — the seat's identity — is preserved byte-for-byte across the rename.
-
-`<base>` is resolved **deterministically** the moment either skill fires by the `handover-dir` command (shipped in the plugin's `bin/`, which Claude Code adds to the Bash tool's `PATH` while the plugin is enabled):
-
-1. Walk up from `$PWD`. At each ancestor:
-   1. If `.handover/` exists, return its absolute path.
-   2. Else if a legacy v2.x `.claude/handover/` exists, lift it to `.handover/` at the same level (atomic rename), drop the now-empty `.claude/` if no siblings remain, then return the new path.
-2. If no ancestor has either, fall back to `$HOME/.handover` (created if missing).
-
-The agent never constructs `<base>` from `cwd` itself — it runs `handover-dir` and uses its stdout verbatim. This guarantees that a session started from a subdirectory of a workspace lands in the workspace's `.handover/`, not in the subdirectory. The resolution runs only when `/handover` or `/takeover` is invoked — sessions that never use either skill incur no overhead.
-
-These documents are **local-only working artifacts** — add `.handover/` to your `.gitignore` (or your global gitignore) so they are not committed.
-
-### Document schema
-
-YAML frontmatter (three stable fields) followed by two body blocks. The filename names the current holder; the frontmatter names the seat.
-
-- **Frontmatter** (preserved byte-for-byte across handovers and takeovers, unless the role itself shifts):
-  - `project` — kebab-case slug naming the project this seat belongs to (e.g. `portfolio-manager`).
-  - `role` — kebab-case slug naming the role this seat fills (e.g. `release-manager`, `kb-curator`). Names the **seat**, not the current task.
-  - `description` — one-line job description, ≤ ~80 chars (e.g. `Drive the release cycle — version bumps, changelogs, deploy, post-release verification`). Treat it like a role description in a hiring document.
-- **`## Knowledge`** (the holder's handoff report, present-tense) — `Goals & Non-Goals`, `Current State`, `Mental Model`, `Facts` (with evidence), `Hypotheses` (with confidence), `References`. **Rewritten by the holder at each `/handover`** so it stays lean and current.
-- **`## History`** (the seat's accountability ledger, append-only) — `YYYY-MM-DDThh:mm [type] ...` entries, newest at the bottom. Types: `attempt`, `finding`, `decision`, `failure` (with `lesson:`), `pivot`, `takeover` (written automatically by `/takeover` when the file is renamed), `handover` (closes a tenure).
-
-Artifacts (commits, PRs, issues, code) are **referenced, never duplicated**; only information that exists nowhere else (hypotheses, failures, rationale, mental model) is written inline. Secrets are redacted.
-
-### How it works
-
-**`/handover`** — if you already hold a seat this session (from a takeover, or from minting one earlier), you update your `<your-name>.md`; otherwise you mint a new seat by picking a fresh holder name and writing the full (`project`, `role`, `description`) frontmatter for the first time. The skill rewrites the `## Knowledge` block, appends what happened to `## History`, and closes your tenure with a `[handover]` entry.
-
-**`/takeover <holder>`** takes over the seat currently held by `<holder>` directly; **`/takeover`** with no argument lists the documents in `<base>/` and lets you choose one (labelled by `<holder> — <project>/<role>` with the frontmatter `description` and last-modified time, body not read until selection). On selection:
-
-1. The successor mints their **own** name (not the predecessor's), picking a first name not already taken.
-2. The file is renamed `<predecessor>.md` → `<successor>.md`.
-3. A `[takeover]` entry is appended to `## History` noting the predecessor and whether the seat was closed properly (`[handover]` last) or forcibly taken.
-4. The successor reads the full handoff package and treats every Knowledge claim as a hypothesis until they verify it against reality. Divergences are recorded as `finding` entries in `## History`; the `## Knowledge` block is reconciled at the successor's next `/handover`, when their audited understanding replaces the predecessor's report under their own name.
-5. Every `References` entry and every `[ref: ...]` in `## History` becomes a **mandatory read task** — one task per unique artifact, bundles decomposed mechanically, no relevance judgment allowed. The successor drains all read tasks before any work starts, recording a short digest per artifact; unreachable artifacts are recorded as `finding` entries, never silently skipped. (The takeover skill's Steps 6–7 are the canonical definition.)
-
-**Forced takeover**: if the predecessor did not close their tenure with `[handover]` (their session ended without `/handover`, or they vacated abruptly), takeover is still allowed. The `[takeover]` entry records the irregular transition.
-
-Outstanding work is externalized to the task tool so it survives context compression, and task status is kept current (`in_progress` on start, `completed` only when done) so the task list is always a truthful progress report.
-
-### Upgrading from v3.x
-
-v3.x documents used a `description`-only frontmatter and modeled takeover as identity inheritance (the successor adopted the predecessor's name; no rename). v4 changes both: frontmatter gains `project` and `role`, and the file is renamed to the successor's own name at takeover.
-
-On first `/takeover` of a v3.x document, the skill detects the missing `project` and/or `role` fields, proposes values (`project` inferred from the git repo root basename when applicable; `role` inferred as a kebab-case slug from the existing `description`), and asks the user to confirm before writing the migrated frontmatter. The body (`## Knowledge`, `## History`) is not touched. The migration runs at most once per seat.
-
-### Upgrading from v2.x
-
-v2.x stored documents at `.claude/handover/<name>.md`. v3 and v4 use `.handover/<name>.md`. **The migration runs automatically on first invocation of `/handover` or `/takeover` after upgrade** — `handover-dir` lifts the legacy directory in place. No manual `mv` is required.
-
-To pin handovers to a particular workspace root, create `.handover/` there once (`mkdir <root>/.handover`); from then on every session under that root resolves to it.
-
-### Installation
-
-```
-/plugin marketplace add lacolaco/claude-plugins
-/plugin install session-handover@lacolaco-plugins
-```
 
 ## session-tts
 
