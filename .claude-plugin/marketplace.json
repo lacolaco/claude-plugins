@@ -22,12 +22,6 @@
       "description": "Read Claude Code responses aloud locally with a different Japanese voice per session. Instructs Claude to deliver mid-turn progress narration via a synchronous Bash call into the say adapter, plus a TodoWrite hook that nudges narration at task transitions. Permission prompts include the workspace name. ON by default; configurable via SESSION_TTS_ENABLED and SESSION_TTS_VOLUME env vars in settings.json; /session-tts:tts and /session-tts:volume for runtime overrides. Engine and models are managed automatically. Apple Silicon only.",
       "version": "0.12.0",
       "source": "./session-tts"
-    },
-    {
-      "name": "tech-writing",
-      "description": "Japanese technical writing norms for books, articles, and documentation. Covers formatting (footnotes, column headings), paragraph structure (paragraph writing), argumentative rigor, reader cognitive load management, perspective and narration, restraint in rhetoric, LLM-style filler prohibition, and redundancy elimination.",
-      "version": "2.1.2",
-      "source": "./tech-writing"
     }
   ]
 }
