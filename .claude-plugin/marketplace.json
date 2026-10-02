@@ -18,12 +18,6 @@
       "source": "./session-handover"
     },
     {
-      "name": "retrospective",
-      "description": "Retrospective grounded in garbage-in-garbage-out: traces problems from Output back to their upstream origin across six stages, then fixes at the stage where the cause lives. Knowledge deficiencies get knowledge fixes, not downstream rule patches. Implements fixes in the current session. Critic findings require explicit disposition (actioned or contested) — silent dismissal is structurally blocked.",
-      "version": "5.0.1",
-      "source": "./retrospective"
-    },
-    {
       "name": "session-tts",
       "description": "Read Claude Code responses aloud locally with a different Japanese voice per session. Instructs Claude to deliver mid-turn progress narration via a synchronous Bash call into the say adapter, plus a TodoWrite hook that nudges narration at task transitions. Permission prompts include the workspace name. ON by default; configurable via SESSION_TTS_ENABLED and SESSION_TTS_VOLUME env vars in settings.json; /session-tts:tts and /session-tts:volume for runtime overrides. Engine and models are managed automatically. Apple Silicon only.",
       "version": "0.12.0",
