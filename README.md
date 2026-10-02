@@ -11,7 +11,6 @@ Claude Code plugins by lacolaco.
 | [retrospective](./retrospective) | GIGO-grounded retrospective — trace problems to their upstream origin, fix at the stage where the cause lives |
 | [session-tts](./session-tts) | Read Claude Code responses aloud locally with a different Japanese voice per session. Instructs Claude to deliver mid-turn progress narration via a synchronous Bash call into the say adapter. Permission prompts include the workspace name. ON by default; controllable via `SESSION_TTS_ENABLED` env var; playback volume is adjustable via `/session-tts:volume`. Engine and voices are managed automatically (Apple Silicon) |
 | [tech-writing](./tech-writing) | Japanese technical writing norms for books, articles, and documentation |
-| [memory-sanitize](./memory-sanitize) | Reproducible Japanese prose quality checker using textlint-ja + custom rules. Detection only, no auto-fix. Requires Node.js |
 
 ## protect-main-branch
 
@@ -394,25 +393,6 @@ The rules are ported from [a gist by k16shikano](https://gist.github.com/k16shik
 /plugin marketplace add lacolaco/claude-plugins
 /plugin install tech-writing@lacolaco-plugins
 ```
-
-## memory-sanitize
-
-Reproducible Japanese prose quality checker for persistent layers (memory, CLAUDE.md, skill definitions, style guides). Combines textlint-ja rules with custom rules to enforce writing discipline. Detection only — no auto-fix.
-
-### How it works
-
-The `/memory-sanitize` skill runs a two-stage check: first a mechanical textlint pass via `check.sh` (standard textlint-ja rules + six custom rules: `no-english-word`, `no-paren-equals-gloss`, `no-em-dash-ja`, `no-heading-separator`, `no-space-after-ja-punctuation`, `no-confusable-cyrillic`. The last two live in `scripts/rules-gate/` because they can be driven to zero without editorial judgement, and CI enforces just those via `scripts/check-gate.sh`), then an agent-driven prose quality review referencing the `tech-writing` skill.
-
-### Installation
-
-```
-/plugin marketplace add lacolaco/claude-plugins
-/plugin install memory-sanitize@lacolaco-plugins
-```
-
-### Prerequisites
-
-- Node.js (packages fetched via `npx` on first run)
 
 ## License
 
