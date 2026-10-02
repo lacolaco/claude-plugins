@@ -8,7 +8,6 @@ Claude Code plugins by lacolaco.
 |--------|-------------|
 | [protect-main-branch](./protect-main-branch) | Prevent git operations that would modify the main branch (configurable) |
 | [session-handover](./session-handover) | Job-succession handover/takeover: each document is a job seat identified by (project, role); the successor renames it to their own name, audits the inherited handoff report, reads every referenced artifact via mandatory read tasks, and continues under fresh accountability |
-| [retrospective](./retrospective) | GIGO-grounded retrospective — trace problems to their upstream origin, fix at the stage where the cause lives |
 | [session-tts](./session-tts) | Read Claude Code responses aloud locally with a different Japanese voice per session. Instructs Claude to deliver mid-turn progress narration via a synchronous Bash call into the say adapter. Permission prompts include the workspace name. ON by default; controllable via `SESSION_TTS_ENABLED` env var; playback volume is adjustable via `/session-tts:volume`. Engine and voices are managed automatically (Apple Silicon) |
 | [tech-writing](./tech-writing) | Japanese technical writing norms for books, articles, and documentation |
 
@@ -169,46 +168,6 @@ To pin handovers to a particular workspace root, create `.handover/` there once 
 ```
 /plugin marketplace add lacolaco/claude-plugins
 /plugin install session-handover@lacolaco-plugins
-```
-
-## retrospective
-
-Provides the `/retrospective` skill: traces problems from Output back to their upstream origin across six stages, then fixes at the stage where the cause lives — grounded in the garbage-in-garbage-out principle.
-
-### How it works
-
-The skill walks through four phases:
-
-1. **Session facts** — brief chronological record; inventory every rule and knowledge source in context
-2. **Bottom-up tracing** — walk from Output back to Input, surface problems and opportunities at each stage, trace each to its originating stage via root cause test
-3. **Remediation design** — **design** (not implement) fixes at the stage where the cause lives:
-   - **Input** causes (missing/stale knowledge) → knowledge operations (ingest, revise, reorganize), project docs, tool config
-   - **Interpretation** causes (rules misread) → fix/move/delete rules
-   - **Planning** causes → codify as skill or agent
-   - **Action** causes → automate or add guardrails
-   - **Inspection** causes → strengthen verification
-   - **Output** causes → fix reporting or persistence
-4. **Implementation** — executes only after critic audit and disposition. No fix is implemented before critics run.
-
-The retrospective does not write to memory — memory is managed by other workflows. Global-layer changes are prepared as actionable prompts for a global-layer-managing agent.
-
-At Submission (between Phase 4 and 5), three critic agents run in parallel from independent contexts:
-
-| Agent | Perspective |
-|-------|-------------|
-| `critic-coverage` | Exhaustiveness — source enumeration, stage coverage, missed problems |
-| `critic-classification` | Correctness — stage attribution, library drift |
-| `critic-remediation` | Remediation soundness — stage alignment, implementation verification, style |
-
-Every critic finding requires an explicit disposition: **actioned** (with evidence) or **contested** (with a specific counter-argument). Silent dismissal of findings is structurally blocked.
-
-All workspace-local outcomes are written directly. The skill does not modify the global `~/.claude/` layer but prepares global changes as agent-executable prompts.
-
-### Installation
-
-```
-/plugin marketplace add lacolaco/claude-plugins
-/plugin install retrospective@lacolaco-plugins
 ```
 
 ## session-tts
