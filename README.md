@@ -144,6 +144,8 @@ Bash(
 )
 ```
 
+`say.sh` echoes the phrase to stdout before speaking it (also when nothing is spoken because the session is silenced or has no voice), so the Bash result already shows the report on screen. The injected instructions tell the model to report through the `say.sh` call alone and not repeat the same sentence in chat text.
+
 The call blocks for the duration of synthesis + playback. The 100-character cap and milestone-only discipline keep that block short enough not to disrupt the turn.
 
 `skills/say/say.sh` is the same implementation used by the Stop / Notification hook adapters; it goes through `voice-context.sh::resolve_speaker` → `speak_text` and is automatically a no-op if the session has been silenced via `/session-tts:tts off`.

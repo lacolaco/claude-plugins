@@ -89,7 +89,7 @@ in the background.
 | ------------------------------------ | ----------------------------------------------- | -------------------------------------------- |
 | `scripts/dispatch.sh`                | Stop / StopFailure hook stdin (JSON)            | speaks `last_assistant_message`              |
 | `scripts/notify-permission.sh`       | `Notification:permission_prompt` hook stdin     | speaks `${basename(cwd)}で承認待ちです。`    |
-| `skills/say/say.sh`                  | Bash tool argv (model-driven, synchronous)      | speaks argv[1] verbatim                      |
+| `skills/say/say.sh`                  | Bash tool argv (model-driven, synchronous)      | echoes argv[1] to stdout, then speaks it |
 | `scripts/session-on.sh` (special)    | `SessionStart` hook stdin                       | speaks "TTSを開始します。" (1st run only) + injects guidance via stdout |
 | `scripts/session-end.sh`             | `SessionEnd` hook stdin                         | SIGTERMs the session's in-flight playback (does not speak) so audio doesn't outlive the session that started it |
 | `scripts/remind-say.sh todo`         | `PostToolUse:TodoWrite` hook stdin              | injects `hookSpecificOutput.additionalContext` reminder (does not speak) |
