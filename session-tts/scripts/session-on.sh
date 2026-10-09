@@ -113,7 +113,11 @@ Avoid:
 - The final response of a turn (Stop hook narrates the final assistant
   message automatically)
 
-say.sh itself is a no-op if TTS has been silenced via /session-tts:tts off,
+say.sh prints the phrase to stdout, so the Bash result already shows it
+to the user: report through the say.sh call alone and do not repeat the
+same sentence in your chat text.
+
+say.sh itself skips speaking if TTS has been silenced via /session-tts:tts off,
 so it's safe to call it without checking silence status.
 EOF
 

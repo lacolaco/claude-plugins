@@ -4,6 +4,10 @@
 #
 # Usage: say.sh "<short Japanese text>"
 #
+# The text is echoed to stdout first (so the report shows up in the Bash
+# tool result and the model need not repeat it in chat), then spoken. It is
+# echoed even when nothing is spoken (silenced, no voice assigned).
+#
 # session_id is taken from $CLAUDE_CODE_SESSION_ID (set by Claude Code for
 # skill invocations). The skill receives no hook payload, so this adapter
 # resolves the voice context independently from the hook adapters.
@@ -24,6 +28,9 @@ session_id="${CLAUDE_CODE_SESSION_ID:-}"
 
 [ -z "$text" ] && exit 0
 
+printf '%s\n' "$text"
+
 speaker_id=$(resolve_speaker "$session_id") || exit 0
 
-speak_text "$speaker_id" "$text" "$session_id"
+# Engine output goes to /dev/null so stdout carries only the echoed text.
+speak_text "$speaker_id" "$text" "$session_id" >/dev/null

@@ -35,7 +35,7 @@ cmd="bash \"$plugin_root/skills/say/say.sh\" \"<phrase>\""
 
 # Tail of every reminder — kept short and identical so the model
 # pattern-matches it as boilerplate it can compress.
-tail_common="Call Bash (synchronous; do NOT pass run_in_background) with command: \`$cmd\`. Open with a brief lead-in (報告です / 着手します / 完了です / 発見です / 方針転換です など), keep it under ~100 Japanese characters. The call blocks until playback finishes, so report only at real milestones. Skip if you just narrated in the immediately preceding step."
+tail_common="Call Bash (synchronous; do NOT pass run_in_background) with command: \`$cmd\`. Open with a brief lead-in (報告です / 着手します / 完了です / 発見です / 方針転換です など), keep it under ~100 Japanese characters. The call blocks until playback finishes, so report only at real milestones. say.sh echoes the phrase to stdout, so report through this call alone and do not repeat the sentence in chat text. Skip if you just narrated in the immediately preceding step."
 
 case "$trigger" in
   todo)

@@ -144,9 +144,11 @@ Bash(
 )
 ```
 
+`say.sh` echoes the phrase to stdout before speaking it (also when nothing is spoken because the session is silenced or has no voice), so the Bash result already shows the report on screen. The injected instructions tell the model to report through the `say.sh` call alone and not repeat the same sentence in chat text.
+
 The call blocks for the duration of synthesis + playback. The 100-character cap and milestone-only discipline keep that block short enough not to disrupt the turn.
 
-`skills/say/say.sh` is the same implementation used by the Stop / Notification hook adapters; it goes through `voice-context.sh::resolve_speaker` → `speak_text` and is automatically a no-op if the session has been silenced via `/session-tts:tts off`.
+`skills/say/say.sh` is the same implementation used by the Stop / Notification hook adapters; it goes through `voice-context.sh::resolve_speaker` → `speak_text` and automatically skips speaking if the session has been silenced via `/session-tts:tts off`.
 
 Suggested calling moments:
 
@@ -162,7 +164,7 @@ The plugin nudges Claude toward making this call via two mechanisms:
 1. A `SessionStart` instruction injected through the hook's stdout (declares the calling moments, lead-in rule, and the exact synchronous Bash call shape).
 2. Four reminder hooks, all dispatched through `scripts/remind-say.sh <trigger>`, that re-surface the narration rule at point-in-time milestones — `PostToolUse:TodoWrite` (task transition), `PreToolUse:Monitor` (long watch starting), `PreToolUse:Agent` (sub-agent dispatch), `UserPromptSubmit` (new turn boundary). Each injects a short reminder via `hookSpecificOutput.additionalContext` (or stdout for UserPromptSubmit) and does not produce audio — the model owns wording and 枕詞 because hook payloads are typically English/terse and the engine is Japanese. Each reminder ends with `Skip if you just narrated in the immediately preceding step.` so the model self-throttles when several triggers fire close together.
 
-Actual frequency is still up to model judgment. `say.sh` itself is a no-op if TTS has been silenced via `/session-tts:tts off`, so accidental calls during silenced sessions don't produce audio.
+Actual frequency is still up to model judgment. `say.sh` itself skips speaking if TTS has been silenced via `/session-tts:tts off`, so accidental calls during silenced sessions don't produce audio.
 
 ### Toggle voice playback: `/session-tts:tts`
 
