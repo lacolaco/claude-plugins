@@ -543,6 +543,10 @@ which produces the appropriate `hookSpecificOutput.additionalContext`
 (or stdout, for UserPromptSubmit) — that is, no audio is produced;
 just a short reminder Claude reads before the next response.
 
+A subagent shares the lead's `session_id`, and its tool-event payloads
+carry a non-empty `agent_id`. `remind-say.sh` exits without output for
+such payloads, so reminders reach only the lead conversation.
+
 | Trigger          | Hook event / matcher                | Milestone it forces                                                   |
 | ---------------- | ----------------------------------- | --------------------------------------------------------------------- |
 | `todo`           | `PostToolUse` / `TodoWrite`         | task transition (todo state changed)                                  |
