@@ -101,7 +101,7 @@ The plugin subscribes to six hook events:
   - **`PreToolUse:Monitor`** — about to watch a long-running background task: nudge to narrate what/why
   - **`PreToolUse:Agent`** — about to dispatch a sub-agent: nudge to narrate the delegated work + plan
   - **`UserPromptSubmit`** — new turn boundary: nudge to narrate at milestones if this becomes multi-step
-  All four dispatch through `scripts/remind-say.sh <trigger>` and return `hookSpecificOutput.additionalContext` (or, for UserPromptSubmit, stdout) reminding Claude to call `say.sh` via Bash synchronously (no `run_in_background`). The model still owns wording and 枕詞. No-op when the session has no voice or has been silenced. High-frequency tools (Write/Edit/Bash) are deliberately not matched to avoid context spam.
+  All four dispatch through `scripts/remind-say.sh <trigger>` and return `hookSpecificOutput.additionalContext` (or, for UserPromptSubmit, stdout) reminding Claude to call `say.sh` via Bash synchronously (no `run_in_background`). The model still owns wording and 枕詞. No-op when the session has no voice, has been silenced, or the hook fires inside a subagent (payload carries `agent_id`). High-frequency tools (Write/Edit/Bash) are deliberately not matched to avoid context spam.
 
 On the first session ever, the SessionStart hook downloads the local TTS engine binary into `~/.claude/session-tts/engine/` and installs the three voice models. From then on it just probes the engine's health endpoint (sub-100 ms) and exits.
 

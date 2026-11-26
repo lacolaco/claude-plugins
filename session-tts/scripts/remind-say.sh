@@ -24,6 +24,11 @@ trigger="${1:-}"
 
 input=$(cat)
 session_id=$(printf '%s' "$input" | jq -r '.session_id // empty')
+agent_id=$(printf '%s' "$input" | jq -r '.agent_id // empty')
+
+# A subagent shares the lead's session_id; its tool-event payloads carry
+# a non-empty agent_id. Narration belongs to the lead, so stay silent.
+[ -n "$agent_id" ] && exit 0
 
 data_dir="$HOME/.claude/session-tts"
 [ -z "$session_id" ] && exit 0
