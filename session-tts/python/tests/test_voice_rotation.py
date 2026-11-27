@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 from pathlib import Path
 
@@ -143,3 +144,61 @@ def test_silenced_session_is_not_reassigned(env: dict[str, str], tmp_path: Path)
     subprocess.run(["bash", str(_SAY_SH), "報告です"], env=e, check=True, capture_output=True)
     assert _speaker(env, "old") == "888753760"
     assert not (tmp_path / "spoken-speakers").exists()
+
+
+# --- stereo position (sessions/<sid>/pan) ---------------------------------
+
+_PAN_RE = re.compile(r"-?(0(\.[0-9]+)?|1(\.0+)?)")
+
+
+def _pan(env: dict[str, str], sid: str) -> str | None:
+    f = _data_dir(env) / "sessions" / sid / "pan"
+    return f.read_text().strip() if f.exists() else None
+
+
+def _say(env: dict[str, str], sid: str) -> None:
+    e = dict(env)
+    e["CLAUDE_CODE_SESSION_ID"] = sid
+    subprocess.run(["bash", str(_SAY_SH), "報告です"], env=e, check=True, capture_output=True)
+
+
+def test_session_start_assigns_valid_random_pan(env: dict[str, str]) -> None:
+    for i in range(10):
+        _session_start(env, f"s{i}")
+    pans = [_pan(env, f"s{i}") for i in range(10)]
+    assert all(p is not None and _PAN_RE.fullmatch(p) for p in pans), pans
+    assert len(set(pans)) > 1, pans
+
+
+def test_pan_is_stable_across_refire_and_off_on(env: dict[str, str]) -> None:
+    _session_start(env, "a")
+    first = _pan(env, "a")
+    _session_start(env, "a")
+    _tts(env, "a", "off")
+    _tts(env, "a", "on")
+    _say(env, "a")
+    assert _pan(env, "a") == first
+
+
+def test_disabled_session_gets_pan_on_late_activation(env: dict[str, str]) -> None:
+    _session_start(env, "late", enabled="0")
+    assert _pan(env, "late") is None
+    _tts(env, "late", "on")
+    assert _PAN_RE.fullmatch(_pan(env, "late") or "")
+
+
+def test_session_with_voice_but_no_pan_gets_one_on_speech(env: dict[str, str]) -> None:
+    d = _data_dir(env) / "sessions" / "old"
+    d.mkdir(parents=True)
+    (d / "speaker").write_text(_ROTATION[2] + "\n")
+    _say(env, "old")
+    assert _speaker(env, "old") == _ROTATION[2]
+    assert _PAN_RE.fullmatch(_pan(env, "old") or "")
+
+
+@pytest.mark.parametrize("content", ["", "left", "1.5", "-2", "0.5.1"])
+def test_invalid_pan_is_replaced(env: dict[str, str], content: str) -> None:
+    _session_start(env, "a")
+    (_data_dir(env) / "sessions" / "a" / "pan").write_text(content)
+    _say(env, "a")
+    assert _PAN_RE.fullmatch(_pan(env, "a") or "")

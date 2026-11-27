@@ -13,6 +13,10 @@ and the invariants that hold across hooks and skills.
 - **One stable voice per session.** Multiple concurrent Claude Code
   sessions must be distinguishable by ear, and the assignment must
   survive `/clear` and `/compact` re-fires of `SessionStart`.
+- **One stable stereo position per session.** Each session also plays
+  from its own left/right position, picked at random and kept for the
+  session, so concurrent sessions can be told apart by direction as
+  well as by voice. Both ears stay audible at every position.
 - **Concurrent sessions never silence each other.** Single-flight is
   scoped per session, not global — a Stop in session B must not cut
   off session A. Otherwise the per-session voice rotation is
@@ -41,7 +45,7 @@ session-tts/
 │   ├── notify-permission.sh       # Notification:permission_prompt adapter
 │   ├── remind-say.sh              # Reminder adapter for PostToolUse:TodoWrite, PreToolUse:Monitor, PreToolUse:Agent, UserPromptSubmit (trigger passed as argv[1])
 │   ├── say-response.py            # CORE: text → audio
-│   └── lib/voice-context.sh       # voice table + shared ensure_speaker / resolve_speaker / speak_text helpers
+│   └── lib/voice-context.sh       # voice table + shared ensure_speaker / ensure_pan / resolve_speaker / speak_text helpers
 ├── python/
 │   ├── pyproject.toml             # uv-managed runtime (httpx, py7zr)
 │   └── setup_engine.py            # engine install / migration / start
@@ -57,7 +61,8 @@ session-tts/
 The plugin is structured as a single **core** (`say-response.py`)
 plus thin **adapters**, one per input source. Hook payload shapes and skill
 argument conventions stay inside the adapters; the core only sees plain
-UTF-8 text on stdin and a speaker id on `SESSION_TTS_SPEAKER_ID`.
+UTF-8 text on stdin and a speaker id on `SESSION_TTS_SPEAKER_ID`; it reads
+the session's stereo position from `sessions/<sid>/pan` itself.
 
 ## 3. Data flow
 
@@ -65,15 +70,16 @@ UTF-8 text on stdin and a speaker id on `SESSION_TTS_SPEAKER_ID`.
 
 ```
 adapter (hook stdin / skill arg)
-  → resolve_speaker (lib/voice-context.sh)
+  → resolve_speaker (lib/voice-context.sh; assigns a missing pan)
   → speak_text (lib/voice-context.sh)
-  → say-response.py (stdin = text, env = speaker)
+  → say-response.py (stdin = text, env = speaker + session id)
       ├── kill_previous_playback (preempt)
       ├── clean()              # strip markdown
       ├── split_into_chunks()  # paragraph → sentence (commas not used)
-      ├── synth_worker  ──┐
+      ├── resolve_pan()        # sessions/<sid>/pan × PAN_RANGE
+      ├── synth_worker  ──┐    (/synthesis → apply_pan: mono → stereo WAV)
       │                    ├── play_queue (FIFO)
-      └── player_worker ──┘    (afplay each WAV in order)
+      └── player_worker ──┘    (afplay --volume each WAV in order)
 ```
 
 Synth and playback run on separate threads with a `queue.Queue` between
@@ -177,6 +183,7 @@ State is keyed by user, not by repo, so all sessions share the engine
 └── sessions/
     └── <session_id>/             # per-session directory (all state colocated)
         ├── speaker               # assigned speaker_id (style_id)
+        ├── pan                   # stereo position in [-1, 1], scaled by PAN_RANGE at playback
         ├── silenced              # presence file → session is muted
         └── playback              # current playback's process group id
 ```
@@ -189,6 +196,12 @@ Invariants:
   session that started disabled — and is read by every subsequent hook
   and skill adapter. It is rewritten only when it holds an id outside
   the current voice table (see §5).
+- `sessions/<sid>/pan` is written by `ensure_pan` whenever
+  `ensure_speaker` runs (first active `SessionStart`, `/session-tts:tts
+  on`, and every speech via `resolve_speaker`) and holds no valid
+  position yet. A session that already had a voice before 0.15.0 gets
+  its position on its next speech. Once valid, it is never rewritten,
+  so the position survives clear/compact re-fires and `tts off`/`on`.
 - A session is silenced **iff** `sessions/<sid>/silenced` exists. The
   speaker and silenced files are independent, so toggling silence does
   not change voice.
@@ -265,6 +278,22 @@ written by 0.13 or earlier) is replaced by the next voice in the
 rotation the next time the session speaks, instead of the engine
 rejecting every synthesis request. Silenced sessions are left as they
 are until they are turned on.
+
+### 5.1 Stereo position
+
+`ensure_pan` (called at the start of `ensure_speaker`) keeps a valid
+`sessions/<sid>/pan` and otherwise writes a uniformly random position
+in `-1.000..1.000` (bash `$RANDOM`). Positions are independent per
+session, so two sessions can land close together; unlike the voice
+there is no rotation cursor. A file that is unreadable or outside
+`[-1, 1]` is replaced the next time `ensure_speaker` runs, and
+`say-response.py::resolve_pan()` plays such a file centred in the
+meantime.
+
+The file stores the position, not the pan: `resolve_pan()` multiplies
+it by `PAN_RANGE` (0.8). Changing that one constant moves every
+session, including existing ones, and keeps both ears audible as long
+as it is below 1.
 
 ## 6. Engine bootstrap
 
@@ -432,6 +461,20 @@ skill (`skills/volume/volume.sh`), which validates the value and
 writes it to the same file. The file is read per chunk rather than
 once per `say-response.py` process so an in-flight utterance picks
 up a volume change starting with its next chunk.
+
+### 7.5 Stereo panning
+
+VOICEVOX's `outputStereo` only duplicates the mono channel and `afplay`
+has no pan option, so `apply_pan()` places the voice in the plugin:
+after `/synthesis` it reads the mono 16-bit WAV with `wave`, writes an
+interleaved stereo WAV with `array`, and scales each channel by the
+constant-power gains `L = cos θ`, `R = sin θ`, `θ = (pan + 1) · π/4`.
+`L² + R²` is 1 at every position and neither gain exceeds 1, so samples
+never clip. At centre each channel gets `cos(π/4) ≈ 0.707` of the mono
+signal, about 3 dB below the mono playback of 0.14.x. Input that is not
+mono 16-bit PCM is passed through unchanged. Only the standard library
+is used (`audioop` was removed in Python 3.13). The volume coefficient
+in §7.4 is still applied by `afplay` on top.
 
 ## 8. Single-flight playback (per session)
 
@@ -676,7 +719,7 @@ the hook adapters.
   chunk). Other sessions are unaffected.
 - **Hook re-entrancy.** `SessionStart` may fire many times for the
   same session (clear/compact). `ensure_speaker` keeps a valid
-  existing voice; the engine bootstrap is idempotent and serialized by
+  existing voice and `ensure_pan` a valid existing position; the engine bootstrap is idempotent and serialized by
   `setup.lock`.
 
 ## 13. External dependencies
@@ -709,12 +752,13 @@ the adapter.
 
 `python/tests/` holds pytest tests for the pure text-processing layer
 of `say-response.py` (`clean`, `_strip_inline_markdown`, `_force_split`,
-`split_into_chunks`). Each text-normalization rule is covered by a
+`split_into_chunks`) and for the stereo panning (`resolve_pan`,
+`apply_pan`). Each text-normalization rule is covered by a
 parametrized block so a regression points at the specific behavior
 that broke. Shell-level tests run `say.sh`, `remind-say.sh`,
 `session-on.sh`, and `tts.sh` against an isolated `HOME` with a stub
 `uv` (voice rotation, the enable gate, late activation, legacy speaker
-ids), and `test_setup_engine_migration.py` covers stopping and removing
+ids, pan assignment and stability), and `test_setup_engine_migration.py` covers stopping and removing
 the legacy AivisSpeech install.
 
 Run locally:
@@ -753,4 +797,5 @@ Per the repo's plugin checklist, behavior changes touch all of:
 A change to the set of hook events that speak, or to the set of voices
 in the rotation, is a breaking change and bumps the major version
 (the minor version while the plugin is below 1.0; 0.14.0 replaced the
-voice set and the engine).
+voice set and the engine; 0.15.0 added the per-session stereo
+position).
