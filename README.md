@@ -7,7 +7,7 @@ Claude Code plugins by lacolaco.
 | Plugin | Description |
 |--------|-------------|
 | [protect-main-branch](./protect-main-branch) | Prevent git operations that would modify the main branch (configurable) |
-| [session-tts](./session-tts) | Read Claude Code responses aloud locally with a different Japanese voice per session. Instructs Claude to deliver mid-turn progress narration via a synchronous Bash call into the say adapter. Permission prompts include the workspace name. ON by default; controllable via `SESSION_TTS_ENABLED` env var; playback volume is adjustable via `/session-tts:volume`. Engine and voices are managed automatically (Apple Silicon) |
+| [session-tts](./session-tts) | Read Claude Code responses aloud locally with a different Japanese voice per session. Instructs Claude to deliver mid-turn progress narration via a synchronous Bash call into the say adapter. Permission prompts include the workspace name. ON by default; controllable via `SESSION_TTS_ENABLED` env var; playback volume is adjustable via `/session-tts:volume`. Engine and voices (VOICEVOX) are managed automatically (Apple Silicon) |
 
 ## protect-main-branch
 
@@ -85,13 +85,13 @@ The allowlist accepts any subcommand, including `commit` and `push` — the plug
 
 ## session-tts
 
-Reads Claude Code's responses aloud on your local machine. Each Claude Code session is automatically assigned one of three different Japanese voices in a fixed rotation, so when several sessions are running you can tell them apart by voice. Synthesis happens locally; no external API is called during playback.
+Reads Claude Code's responses aloud on your local machine. Each Claude Code session is automatically assigned one of five Japanese [VOICEVOX](https://voicevox.hiroshiba.jp/) voices in a fixed rotation (ずんだもん, 四国めたん, 春日部つむぎ, 冥鳴ひまり, 東北きりたん), so when several sessions are running you can tell them apart by voice. Synthesis happens locally on a plugin-managed VOICEVOX Engine; no external API is called during playback.
 
 ### How it works
 
 The plugin subscribes to six hook events:
 
-- **`SessionStart`** — assigns this session a voice from the 3-slot rotation (the assignment is stored at `~/.claude/session-tts/sessions/$session_id/speaker` and stays stable across `clear`/`compact` re-fires). When `SESSION_TTS_ENABLED=0`, the voice is still assigned but the session starts silenced (no context injection, no engine bootstrap, no announcement). It also kicks off a background engine bootstrap that is idempotent: typical re-runs do nothing.
+- **`SessionStart`** — assigns this session the next voice in the rotation (the assignment is stored at `~/.claude/session-tts/sessions/$session_id/speaker` and stays stable across `clear`/`compact` re-fires). When `SESSION_TTS_ENABLED=0`, the session starts silenced without a voice (no context injection, no engine bootstrap, no announcement) and does not consume a rotation slot, so disabled sessions such as workers or `claude -p` runs do not make active sessions share a voice. It also kicks off a background engine bootstrap that is idempotent: typical re-runs do nothing.
 - **`SessionEnd`** — fires when this session terminates (`/clear`, `/compact`, logout, etc.). SIGTERMs any in-flight playback for this session via the per-session pidfile (`sessions/$session_id/playback`) so audio doesn't outlive the session that started it. The session directory and its contents are intentionally left in place so the same session_id keeps its voice across `/clear`.
 - **`Stop`** — fires when Claude finishes a normal response; speaks `last_assistant_message`
 - **`StopFailure`** — fires when the turn ends due to an API error; speaks `last_assistant_message`
@@ -103,7 +103,9 @@ The plugin subscribes to six hook events:
   - **`UserPromptSubmit`** — new turn boundary: nudge to narrate at milestones if this becomes multi-step
   All four dispatch through `scripts/remind-say.sh <trigger>` and return `hookSpecificOutput.additionalContext` (or, for UserPromptSubmit, stdout) reminding Claude to call `say.sh` via Bash synchronously (no `run_in_background`). The model still owns wording and 枕詞. No-op when the session has no voice, has been silenced, or the hook fires inside a subagent (payload carries `agent_id`). High-frequency tools (Write/Edit/Bash) are deliberately not matched to avoid context spam.
 
-On the first session ever, the SessionStart hook downloads the local TTS engine binary into `~/.claude/session-tts/engine/` and installs the three voice models. From then on it just probes the engine's health endpoint (sub-100 ms) and exits.
+On the first session ever, the SessionStart hook downloads VOICEVOX Engine 0.26.2 (macOS arm64, about 1.8 GB; the voice models are bundled) into `~/.claude/session-tts/voicevox-engine/` and starts it on `127.0.0.1:50121`, a port distinct from the VOICEVOX desktop app's default (50021). From then on it just probes the engine's health endpoint (sub-100 ms) and exits; after a reboot it restarts the engine (about 10 s).
+
+Upgrading from session-tts 0.13 or earlier: the first SessionStart stops the AivisSpeech engine the plugin started (recorded in `~/.claude/session-tts/engine.pid`), deletes `~/.claude/session-tts/engine/`, and installs VOICEVOX Engine. Sessions that still hold an AivisSpeech voice id get the next VOICEVOX voice the next time they speak.
 
 ### Architecture
 
@@ -179,7 +181,7 @@ Voice is ON by default in every new session. Use the `/session-tts:tts` skill to
 
 The skill toggles `~/.claude/session-tts/sessions/$CLAUDE_CODE_SESSION_ID/silenced` and is independent of the voice assignment, so silencing then re-enabling preserves the same voice. Switching to `off` additionally kills any utterance still playing for this session (via the per-session playback pidfile), so the silence takes effect immediately rather than draining the remaining chunk queue. Other concurrent sessions are unaffected. The same flag is honored by `say.sh` (used by both the mid-turn narration call described above and the Stop / Notification hook adapters), so silenced sessions stay silent across every entry point.
 
-When `tts on` is called on a session that was silenced at start (via `SESSION_TTS_ENABLED=0`), the skill performs **late activation**: removes the silenced flag, ensures the engine is running, outputs the narration context, and announces "TTSを開始します。" — enabling full TTS mid-session without requiring a restart.
+When `tts on` is called on a session that was silenced at start (via `SESSION_TTS_ENABLED=0`), the skill performs **late activation**: assigns the session the next voice in the rotation, removes the silenced flag, ensures the engine is running, outputs the narration context, and announces "TTSを開始します。" — enabling full TTS mid-session without requiring a restart.
 
 ### Adjust playback volume: `/session-tts:volume`
 
@@ -218,9 +220,9 @@ All configuration is done via environment variables in Claude Code's `settings.j
 
 | Variable | Values | Default | Description |
 |----------|--------|---------|-------------|
-| `SESSION_TTS_ENABLED` | `1`/`true`/`yes` or `0`/`false`/`no` | `1` | Controls whether TTS activates on session start. When disabled, the voice is still assigned but the session starts silenced. `/session-tts:tts on` performs late activation. |
+| `SESSION_TTS_ENABLED` | `1`/`true`/`yes` or `0`/`false`/`no` | `1` | Controls whether TTS activates on session start. When disabled, the session starts silenced without a voice. `/session-tts:tts on` performs late activation and assigns the voice then. |
 | `SESSION_TTS_VOLUME` | Decimal in `[0.0, 1.0]` | `0.8` | Default `afplay --volume` coefficient. Used when the volume file does not exist. `/session-tts:volume` writes to the file and takes priority. |
-| `SESSION_TTS_ENGINE_URL` | URL | `http://127.0.0.1:10101` | TTS engine HTTP endpoint. For advanced use only (custom engine port or remote engine). |
+| `SESSION_TTS_ENGINE_URL` | URL | `http://127.0.0.1:50121` | TTS engine HTTP endpoint. For advanced use only (custom engine port or remote engine). The bootstrap probes this URL and starts the plugin's engine on its host and port when nothing answers. |
 
 #### Priority chain
 
@@ -228,7 +230,7 @@ Each configurable aspect has a clear override hierarchy (highest priority first)
 
 - **Activation**: runtime `/session-tts:tts off|on` > `SESSION_TTS_ENABLED` env var > default ON
 - **Volume**: volume file (`/session-tts:volume`) > `SESSION_TTS_VOLUME` env var > hardcoded `0.8`
-- **Engine URL**: `SESSION_TTS_ENGINE_URL` env var > hardcoded `http://127.0.0.1:10101`
+- **Engine URL**: `SESSION_TTS_ENGINE_URL` env var > hardcoded `http://127.0.0.1:50121`
 
 ### Installation
 
@@ -244,11 +246,19 @@ After installing, every new session speaks by default with a rotating voice. Use
 - macOS on Apple Silicon (M1+)
 - [`uv`](https://docs.astral.sh/uv/) on `PATH`
 - `jq` on `PATH`
-- Internet access on the **first** SessionStart only — to fetch the engine binary (~200 MB) and the three voice models (~50 MB total). Subsequent sessions run fully offline.
+- Internet access on the **first** SessionStart only — to fetch the VOICEVOX Engine archive (~1.8 GB download, ~2 GB on disk; voice models included). Subsequent sessions run fully offline.
 
 ### Voices and licensing
 
-The bundled voices are licensed under [ACML 1.0](https://aivm-specs.aivis-project.com/license/acml/) and downloaded from [AivisHub](https://hub.aivis-project.com/) on first use. ACML 1.0 permits personal use with credit; check the per-voice terms on AivisHub before any other use (commercial use, redistribution, derivative works, etc).
+| Rotation | Character | Style | Style id |
+|----------|-----------|-------|----------|
+| 1 | ずんだもん | ノーマル | 3 |
+| 2 | 四国めたん | ノーマル | 2 |
+| 3 | 春日部つむぎ | ノーマル | 8 |
+| 4 | 冥鳴ひまり | ノーマル | 14 |
+| 5 | 東北きりたん | ノーマル | 108 |
+
+The engine is [VOICEVOX Engine](https://github.com/VOICEVOX/voicevox_engine), downloaded from its GitHub Releases on first use. Each VOICEVOX character has its own terms of use; check them on the [VOICEVOX site](https://voicevox.hiroshiba.jp/) before using the audio beyond personal listening. Audio you publish needs a credit such as `VOICEVOX:ずんだもん`.
 
 ## License
 

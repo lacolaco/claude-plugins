@@ -25,7 +25,7 @@ import threading
 
 import httpx
 
-ENGINE_BASE_URL = os.environ.get("SESSION_TTS_ENGINE_URL", "http://127.0.0.1:10101")
+ENGINE_BASE_URL = os.environ.get("SESSION_TTS_ENGINE_URL", "http://127.0.0.1:50121")
 SPEAKER_ID = int(os.environ.get("SESSION_TTS_SPEAKER_ID", "0"))
 SESSION_ID = os.environ.get("SESSION_TTS_SESSION_ID", "")
 

@@ -41,10 +41,10 @@ session-tts/
 │   ├── notify-permission.sh       # Notification:permission_prompt adapter
 │   ├── remind-say.sh              # Reminder adapter for PostToolUse:TodoWrite, PreToolUse:Monitor, PreToolUse:Agent, UserPromptSubmit (trigger passed as argv[1])
 │   ├── say-response.py            # CORE: text → audio
-│   └── lib/voice-context.sh       # shared resolve_speaker / speak_text helpers
+│   └── lib/voice-context.sh       # voice table + shared ensure_speaker / resolve_speaker / speak_text helpers
 ├── python/
 │   ├── pyproject.toml             # uv-managed runtime (httpx, py7zr)
-│   └── setup_engine.py            # engine binary + voice model bootstrap
+│   └── setup_engine.py            # engine install / migration / start
 └── skills/
     ├── tts/SKILL.md               # /session-tts:tts on/off/toggle/status
     ├── tts/tts.sh                 # /session-tts:tts skill adapter (silence + kill current playback)
@@ -116,7 +116,7 @@ went through `SessionStart`, silenced, etc.).
 only family of adapters that *injects context* rather than producing
 audio. The reason: hook payloads (todo content, tool args, user
 prompts) are typically English or terse non-sentence text, and
-AivisSpeech is a Japanese engine — feeding the engine raw payload
+the VOICEVOX voices are Japanese — feeding the engine raw payload
 strings would either fail or sound nonsensical. Editorial framing
 (枕詞, summary, lead-in phrase) belongs to the model, which can
 compose a proper Japanese sentence. The hooks' only job is to be a
@@ -143,7 +143,7 @@ itself during operation).
 |----------|---------|---------|---------|
 | `SESSION_TTS_ENABLED` | `session-on.sh` | `1` | Activation gate. `0`/`false`/`no` starts the session silenced. |
 | `SESSION_TTS_VOLUME` | `say-response.py` | `0.8` | Default playback volume. Overridden by the volume file when present. |
-| `SESSION_TTS_ENGINE_URL` | `say-response.py` | `http://127.0.0.1:10101` | Engine HTTP endpoint (advanced/debug). |
+| `SESSION_TTS_ENGINE_URL` | `say-response.py`, `setup_engine.py` | `http://127.0.0.1:50121` | Engine HTTP endpoint (advanced/debug). The bootstrap probes it and, when nothing answers, starts the plugin's engine on its host and port. |
 
 ### Internal (set by the plugin, not for user configuration)
 
@@ -156,21 +156,23 @@ itself during operation).
 
 - **Activation**: runtime `silenced` file > `SESSION_TTS_ENABLED` > default ON
 - **Volume**: volume file > `SESSION_TTS_VOLUME` > hardcoded `0.8`
-- **Engine URL**: `SESSION_TTS_ENGINE_URL` > hardcoded `http://127.0.0.1:10101`
+- **Engine URL**: `SESSION_TTS_ENGINE_URL` > hardcoded `http://127.0.0.1:50121`
 
 ## 4. Disk layout (`~/.claude/session-tts/`)
 
-State is keyed by user, not by repo, so all sessions share the engine and
-voice models.
+State is keyed by user, not by repo, so all sessions share the engine
+(whose voice models ship inside it).
 
 ```
 ~/.claude/session-tts/
-├── engine/                       # extracted AivisSpeech-Engine (arm64)
-│   └── run                       # ENGINE_BIN
-├── engine.pid                    # last-launched engine PID (best-effort)
+├── voicevox-engine/              # extracted VOICEVOX Engine (macos-arm64)
+│   ├── run                       # ENGINE_BIN
+│   └── model/*.vvm               # bundled voice models
+├── voicevox-engine.pid           # last-launched engine PID (best-effort)
 ├── engine.log                    # engine stdout+stderr
+├── setup.lock                    # flock serializing concurrent bootstraps
 ├── setup.log                     # SessionStart background bootstrap log
-├── index                         # voice rotation cursor (0..2)
+├── index                         # voice rotation cursor (0..len(VOICE_IDS)-1)
 ├── volume                        # user-wide afplay --volume coefficient (0.0..1.0); absent or invalid → default 0.8
 └── sessions/
     └── <session_id>/             # per-session directory (all state colocated)
@@ -182,14 +184,17 @@ voice models.
 Invariants:
 
 - A session has a voice **iff** `sessions/<sid>/speaker` exists. The
-  file is created exactly once per session, on the first `SessionStart`,
-  and is read by every subsequent hook and skill adapter.
+  file is created when the session first becomes active — on its first
+  `SessionStart` with TTS enabled, or on `/session-tts:tts on` for a
+  session that started disabled — and is read by every subsequent hook
+  and skill adapter. It is rewritten only when it holds an id outside
+  the current voice table (see §5).
 - A session is silenced **iff** `sessions/<sid>/silenced` exists. The
   speaker and silenced files are independent, so toggling silence does
   not change voice.
-- When `SESSION_TTS_ENABLED=0`, the session starts with both `speaker`
-  and `silenced` present — voice assigned but muted. `/session-tts:tts
-  on` removes `silenced` to perform late activation.
+- When `SESSION_TTS_ENABLED=0`, the session starts with `silenced`
+  present and no `speaker`. `/session-tts:tts on` assigns the voice and
+  removes `silenced` to perform late activation.
 - `sessions/<sid>/playback` reflects the most-recently-launched
   `say-response.py` process group **for that session**. Different
   sessions have separate pidfiles. All utterance types within a
@@ -208,55 +213,90 @@ Invariants:
 
 ## 5. Voice assignment
 
-Three voices are baked in (`setup_engine.py` / `VOICES`); each is
-identified by an `aivm_model_uuid` (for installation) and a `style_id`
-(for `/audio_query` and `/synthesis` calls). The plugin uses the latter
-on the per-session speaker id.
+Five VOICEVOX voices are baked in as `SESSION_TTS_VOICE_IDS` in
+`scripts/lib/voice-context.sh`. Each entry is the style id of the
+character's ノーマル style in VOICEVOX Engine 0.26.2, as listed by
+the engine's `/speakers`, and is passed as `speaker` to `/audio_query`
+and `/synthesis`.
 
-Rotation algorithm (`session-on.sh`):
+| Rotation | Character | Style | Style id |
+|----------|-----------|-------|----------|
+| 0 | ずんだもん | ノーマル | 3 |
+| 1 | 四国めたん | ノーマル | 2 |
+| 2 | 春日部つむぎ | ノーマル | 8 |
+| 3 | 冥鳴ひまり | ノーマル | 14 |
+| 4 | 東北きりたん | ノーマル | 108 |
+
+Each VOICEVOX character has its own terms of use, and published audio
+needs a credit such as `VOICEVOX:ずんだもん`.
+
+Rotation algorithm (`ensure_speaker` in `voice-context.sh`):
 
 ```
+if sessions/<sid>/speaker holds an id in VOICE_IDS: keep it
 prev = read(index_file) or -1
-next = (prev + 1) mod 3
-sessions/<sid>/speaker = VOICES[next].style_id
+next = (prev + 1) mod len(VOICE_IDS)
+sessions/<sid>/speaker = VOICE_IDS[next]
 index_file = next
 ```
 
 Why a separate `index` cursor instead of, say, hashing the session id?
-Predictability: if you open three sessions back-to-back, you get all
-three different voices in order. With a hash you might collide.
+Predictability: if you open five sessions back-to-back, you get all
+five different voices in order. With a hash you might collide.
 
-The rotation happens **only on the first** `SessionStart`. If `clear`
-or `compact` re-fires the hook later, `sessions/<sid>/speaker` already
-exists and the script skips both the rotation step and the
+Only sessions that become active take a slot. `session-on.sh` checks
+the `SESSION_TTS_ENABLED` gate **before** calling `ensure_speaker`, so a
+disabled session (worker, `claude -p`, bot) creates `silenced` and
+exits without a voice. Before 0.14.0 the rotation advanced ahead of the
+gate, so disabled sessions consumed slots and active sessions started
+close together often landed on the same voice. A disabled session that
+is later turned on through `/session-tts:tts on` gets its voice from
+`ensure_speaker` at that point.
+
+The rotation happens **only once per session**. If `clear` or
+`compact` re-fires the hook later, `sessions/<sid>/speaker` already
+holds a valid id and `ensure_speaker` keeps it, which also skips the
 "TTSを開始します。" announcement. That's why `newly_assigned` gates
 the announcement: we do not want to repeat it after every re-fire.
 
-When `SESSION_TTS_ENABLED=0`, the voice is still assigned (so the
-session has a stable identity), but `sessions/<sid>/silenced` is
-created immediately and the hook exits without context injection,
-engine bootstrap, or announcement. This keeps the voice assignment
-unconditional while letting the activation gate be separate.
+`resolve_speaker` also calls `ensure_speaker` for an active session, so
+a speaker file holding an id outside the table (an AivisSpeech style id
+written by 0.13 or earlier) is replaced by the next voice in the
+rotation the next time the session speaks, instead of the engine
+rejecting every synthesis request. Silenced sessions are left as they
+are until they are turned on.
 
 ## 6. Engine bootstrap
 
 `python/setup_engine.py` is run on every `SessionStart` in the
-background. It is split into three idempotent steps:
+background (and on late activation). The whole run holds an exclusive
+`flock` on `setup.lock`, so concurrent sessions do not download or
+spawn twice; the later ones find the engine ready. It is split into
+three idempotent steps:
 
-1. **`ensure_engine_binary`** — if `~/.claude/session-tts/engine/run` is
-   missing, download the AivisSpeech-Engine `.7z.001` from GitHub
-   Releases, extract via `py7zr`, and move `macOS-arm64/` into place.
-2. **`ensure_engine_running`** — if `GET /version` does not respond,
-   spawn the engine with `start_new_session=True` so it outlives the
-   hook process. On macOS, prepend `taskpolicy -t 0 -l 0` to give the
-   engine the highest throughput / latency tiers — without this, output
-   waveforms drift slightly under CPU pressure because tensor-op
-   scheduling becomes non-deterministic.
-3. **`ensure_voices`** — `GET /aivm_models`, compute the missing UUIDs,
-   and `POST /aivm_models/install` for each with the AivisHub download
-   URL.
+1. **`migrate_legacy_engine`** — upgrade path from the AivisSpeech
+   Engine used by 0.13 and earlier. If `engine.pid` exists and that
+   pid is still running from `~/.claude/session-tts/engine/`, send
+   SIGTERM to its process group (SIGKILL after 10 s), then delete the
+   pid file and the `engine/` directory. Both paths are fixed
+   constants under the home directory; a recycled pid that now belongs
+   to another program is not signalled.
+2. **`ensure_engine_binary`** — if `voicevox-engine/run` is missing,
+   download `voicevox_engine-macos-arm64-0.26.2.7z.001` (single part,
+   about 1.8 GB) from GitHub Releases into a temp directory under the
+   data directory, extract it via `py7zr`, and move `macos-arm64/` into
+   place. The archive bundles the voice models (`model/*.vvm`), so
+   there is no model install step.
+3. **`ensure_engine_running`** — if `GET /version` does not respond,
+   spawn `run --host <host> --port <port> --cpu_num_threads 4` with
+   `start_new_session=True` so it outlives the hook process, and wait
+   up to 60 s for `/version` (startup takes about 10 s). The default
+   endpoint is `127.0.0.1:50121`, distinct from the VOICEVOX desktop
+   app's default 50021, so the two never collide. On macOS,
+   `taskpolicy -t 0 -l 0` is prepended to give the engine the highest
+   throughput / latency tiers.
 
-Typical re-runs hit only the first half of step 2 (a sub-100 ms
+Typical re-runs hit only the first half of step 3 (a sub-100 ms
 `/version` probe) and exit. The whole bootstrap is wrapped in a single
 `try/except` and logs failures into `setup.log`; nothing is propagated
 back to the foreground hook so a transient network blip does not break
@@ -620,8 +660,8 @@ the hook adapters.
 ## 12. Concurrency model and invariants
 
 - **Multiple sessions, one engine.** All Claude Code sessions on the
-  same machine share `~/.claude/session-tts/engine/`. The engine is a
-  single OS process bound to `127.0.0.1:10101`; concurrent sessions
+  same machine share `~/.claude/session-tts/voicevox-engine/`. The engine is a
+  single OS process bound to `127.0.0.1:50121`; concurrent sessions
   send concurrent HTTP requests and the engine handles them.
 - **Multiple sessions, independent playback.** Single-flight is
   **per session**, not global. Sessions A and B can speak
@@ -635,9 +675,9 @@ the hook adapters.
   (`killpg` no-ops, temp files are unlinked after `afplay` per
   chunk). Other sessions are unaffected.
 - **Hook re-entrancy.** `SessionStart` may fire many times for the
-  same session (clear/compact). The voice-assignment branch is gated
-  on `! -f "$session_file"`; the engine bootstrap is naturally
-  idempotent.
+  same session (clear/compact). `ensure_speaker` keeps a valid
+  existing voice; the engine bootstrap is idempotent and serialized by
+  `setup.lock`.
 
 ## 13. External dependencies
 
@@ -647,10 +687,9 @@ the hook adapters.
 - **`afplay`** — built into macOS; plays the synthesized WAVs.
 - **`taskpolicy`** — built into macOS; used to boost engine scheduling
   priority. Optional — falls back to default scheduling if absent.
-- **AivisSpeech-Engine** — local TTS engine binary, downloaded from
-  GitHub Releases on first use.
-- **AivisHub** — voice model registry, queried at engine install time
-  for the three voices listed in `VOICES`.
+- **VOICEVOX Engine** — local TTS engine with bundled voice models,
+  downloaded from GitHub Releases (`VOICEVOX/voicevox_engine`) on first
+  use.
 
 ## 14. Adding a new input source
 
@@ -672,7 +711,11 @@ the adapter.
 of `say-response.py` (`clean`, `_strip_inline_markdown`, `_force_split`,
 `split_into_chunks`). Each text-normalization rule is covered by a
 parametrized block so a regression points at the specific behavior
-that broke.
+that broke. Shell-level tests run `say.sh`, `remind-say.sh`,
+`session-on.sh`, and `tts.sh` against an isolated `HOME` with a stub
+`uv` (voice rotation, the enable gate, late activation, legacy speaker
+ids), and `test_setup_engine_migration.py` covers stopping and removing
+the legacy AivisSpeech install.
 
 Run locally:
 
@@ -688,11 +731,10 @@ every push/PR that touches the Python runtime or the core script.
 Out of scope for these tests (intentionally — they need shell-level
 or live-engine harnesses):
 
-- Hook adapters (`scripts/*.sh`, `skills/*/*.sh`)
 - HTTP synthesis (`synth_chunk`, `synth_worker`)
 - Threading and `afplay` orchestration
 - Pidfile / process-group preemption
-- `setup_engine.py` (network + 7z extract)
+- `setup_engine.py` download, extract, and engine start (network + 7z)
 
 The pytest layer is the lower of two test tiers. Plugin behavior at
 the hook / live-audio level is still verified by `claude --plugin-dir
@@ -709,4 +751,6 @@ Per the repo's plugin checklist, behavior changes touch all of:
   "Configuration")
 
 A change to the set of hook events that speak, or to the set of voices
-in the rotation, is a breaking change and bumps the major version.
+in the rotation, is a breaking change and bumps the major version
+(the minor version while the plugin is below 1.0; 0.14.0 replaced the
+voice set and the engine).

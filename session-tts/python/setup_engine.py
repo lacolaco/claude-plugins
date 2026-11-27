@@ -1,11 +1,15 @@
-"""Bootstrap the local TTS engine and required voice models.
+"""Bootstrap the local TTS engine (VOICEVOX Engine).
 
 Idempotent: every step checks state first and skips if already done.
 Designed to run on every SessionStart so the engine is always available;
 typical re-runs do nothing but a port probe.
+
+The VOICEVOX Engine archive bundles its voice models (`model/*.vvm`), so
+there is no separate model install step.
 """
 from __future__ import annotations
 
+import fcntl
 import os
 import shutil
 import signal
@@ -14,40 +18,100 @@ import sys
 import tempfile
 import time
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import httpx
 
 # --- configuration ---------------------------------------------------------
 
-ENGINE_VERSION = "1.2.0"
+ENGINE_VERSION = "0.26.2"
 ENGINE_ASSET = (
-    f"https://github.com/Aivis-Project/AivisSpeech-Engine/releases/download/"
-    f"{ENGINE_VERSION}/AivisSpeech-Engine-macOS-arm64-{ENGINE_VERSION}.7z.001"
+    f"https://github.com/VOICEVOX/voicevox_engine/releases/download/"
+    f"{ENGINE_VERSION}/voicevox_engine-macos-arm64-{ENGINE_VERSION}.7z.001"
 )
-ENGINE_HOST = "127.0.0.1"
-ENGINE_PORT = 10101
+# Top-level directory inside the release archive.
+ENGINE_ARCHIVE_ROOT = "macos-arm64"
+# Plugin-specific port: the VOICEVOX desktop app uses 50021, so the plugin
+# runs its own engine on a different port to avoid colliding with it.
+DEFAULT_ENGINE_URL = "http://127.0.0.1:50121"
+ENGINE_BASE_URL = os.environ.get("SESSION_TTS_ENGINE_URL", DEFAULT_ENGINE_URL)
+_url = urlsplit(ENGINE_BASE_URL)
+ENGINE_HOST = _url.hostname or "127.0.0.1"
+ENGINE_PORT = _url.port or 50121
+ENGINE_CPU_THREADS = 4
 
-# Voice UUIDs and the engine-side style_id of each voice's "ノーマル" style.
-# Order matters: it defines the rotation order for new sessions.
-VOICES = [
-    {"uuid": "a59cb814-0083-4369-8542-f51a29e72af7", "name": "まお", "style_id": 888753760},
-    {"uuid": "e9339137-2ae3-4d41-9394-fb757a7e61e6", "name": "まい", "style_id": 1431611904},
-    {"uuid": "4f281e78-eba6-495a-8e50-5c322d02b5b1", "name": "るな", "style_id": 345585728},
-]
-
-DATA_DIR = Path(os.path.expanduser("~/.claude/session-tts"))
-ENGINE_DIR = DATA_DIR / "engine"
+DATA_DIR = Path.home() / ".claude" / "session-tts"
+ENGINE_DIR = DATA_DIR / "voicevox-engine"
 ENGINE_BIN = ENGINE_DIR / "run"
-ENGINE_PID = DATA_DIR / "engine.pid"
+ENGINE_PID = DATA_DIR / "voicevox-engine.pid"
 ENGINE_LOG = DATA_DIR / "engine.log"
+SETUP_LOCK = DATA_DIR / "setup.lock"
 
-VOICE_LIST = DATA_DIR / "voices.json"
-
-ENGINE_BASE_URL = f"http://{ENGINE_HOST}:{ENGINE_PORT}"
+# Install left behind by session-tts <= 0.13 (AivisSpeech Engine). Both
+# paths are fixed constants derived from the home directory, never from
+# a variable that could be empty.
+LEGACY_ENGINE_DIR = DATA_DIR / "engine"
+LEGACY_ENGINE_PID = DATA_DIR / "engine.pid"
 
 
 def log(msg: str) -> None:
     print(f"[session-tts/setup] {msg}", flush=True)
+
+
+# --- migration from AivisSpeech Engine -------------------------------------
+
+
+def _is_legacy_engine(pid: int) -> bool:
+    r = subprocess.run(
+        ["ps", "-ww", "-o", "command=", "-p", str(pid)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return str(LEGACY_ENGINE_DIR) in r.stdout
+
+
+def _wait_exit(pid: int, timeout: float) -> bool:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if not _is_legacy_engine(pid):
+            return True
+        time.sleep(0.2)
+    return not _is_legacy_engine(pid)
+
+
+def stop_legacy_engine() -> None:
+    """Stop the AivisSpeech engine a previous plugin version started.
+
+    Only the pid recorded in the legacy pid file is signalled, and only if
+    that process is still running from the legacy engine directory, so a
+    recycled pid never hits an unrelated process.
+    """
+    if not LEGACY_ENGINE_PID.exists():
+        return
+    raw = LEGACY_ENGINE_PID.read_text().strip()
+    if raw.isdigit():
+        pid = int(raw)
+        if _is_legacy_engine(pid):
+            log(f"stopping legacy AivisSpeech engine (pid={pid})...")
+            # The engine was started with start_new_session=True, so it
+            # leads its own process group.
+            os.killpg(pid, signal.SIGTERM)
+            if not _wait_exit(pid, 10.0):
+                os.killpg(pid, signal.SIGKILL)
+                _wait_exit(pid, 5.0)
+    LEGACY_ENGINE_PID.unlink()
+
+
+def remove_legacy_engine_dir() -> None:
+    if LEGACY_ENGINE_DIR.is_dir():
+        log(f"removing legacy AivisSpeech engine at {LEGACY_ENGINE_DIR}")
+        shutil.rmtree(LEGACY_ENGINE_DIR)
+
+
+def migrate_legacy_engine() -> None:
+    stop_legacy_engine()
+    remove_legacy_engine_dir()
 
 
 # --- engine binary ---------------------------------------------------------
@@ -56,36 +120,29 @@ def log(msg: str) -> None:
 def ensure_engine_binary() -> None:
     if ENGINE_BIN.exists() and os.access(ENGINE_BIN, os.X_OK):
         return
-    log(f"downloading TTS engine v{ENGINE_VERSION}...")
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory() as tmp:
+    log(f"downloading VOICEVOX Engine v{ENGINE_VERSION} (~1.8 GB)...")
+    # Extract next to the final location so the move is a same-volume rename.
+    with tempfile.TemporaryDirectory(dir=DATA_DIR) as tmp:
         archive = Path(tmp) / "engine.7z"
         with httpx.stream("GET", ENGINE_ASSET, follow_redirects=True, timeout=300.0) as r:
             r.raise_for_status()
             with archive.open("wb") as f:
-                for chunk in r.iter_bytes(1 << 16):
+                for chunk in r.iter_bytes(1 << 20):
                     f.write(chunk)
         log("extracting engine archive...")
         # Lazy import — py7zr pulls a few transitive deps we'd rather not
         # load when the binary is already in place.
         import py7zr  # type: ignore
 
+        extract_dir = Path(tmp) / "extract"
         with py7zr.SevenZipFile(archive, "r") as z:
-            z.extractall(path=tmp)
-        # The archive contains a top-level "macOS-arm64/" dir; move its
-        # contents into ENGINE_DIR so ENGINE_BIN points at the run script.
-        extracted_root = Path(tmp) / "macOS-arm64"
-        if not extracted_root.exists():
-            # Fallback: pick the first directory inside tmp that is not the archive.
-            candidates = [p for p in Path(tmp).iterdir() if p.is_dir()]
-            if not candidates:
-                raise RuntimeError("engine archive layout unexpected")
-            extracted_root = candidates[0]
+            z.extractall(path=extract_dir)
+        extracted_root = extract_dir / ENGINE_ARCHIVE_ROOT
+        if not (extracted_root / "run").exists():
+            raise RuntimeError(f"engine archive layout unexpected: no {ENGINE_ARCHIVE_ROOT}/run")
         if ENGINE_DIR.exists():
             shutil.rmtree(ENGINE_DIR)
         shutil.move(str(extracted_root), str(ENGINE_DIR))
-    if not ENGINE_BIN.exists():
-        raise RuntimeError(f"engine binary not found at {ENGINE_BIN} after extract")
     ENGINE_BIN.chmod(0o755)
     log(f"engine installed at {ENGINE_BIN}")
 
@@ -101,11 +158,10 @@ def is_engine_alive(timeout: float = 1.0) -> bool:
         return False
 
 
-def ensure_engine_running(boot_timeout: float = 30.0) -> None:
+def ensure_engine_running(boot_timeout: float = 60.0) -> None:
     if is_engine_alive():
         return
     log("starting TTS engine...")
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
     log_fh = ENGINE_LOG.open("ab")
     cmd = [
         str(ENGINE_BIN),
@@ -113,22 +169,21 @@ def ensure_engine_running(boot_timeout: float = 30.0) -> None:
         ENGINE_HOST,
         "--port",
         str(ENGINE_PORT),
-        "--no-use_gpu",
-        "--output_log_utf8",
-        "--disable_sentry",
+        "--cpu_num_threads",
+        str(ENGINE_CPU_THREADS),
     ]
     # Boost the engine's scheduling priority on macOS so CPU pressure from
-    # other busy processes doesn't perturb its inference threads. Without
-    # this, output waveforms drift slightly under load because tensor-op
-    # scheduling becomes non-deterministic. taskpolicy ships with macOS and
-    # doesn't need sudo. -t 0 / -l 0 set the highest throughput / latency
-    # tiers for the process.
+    # other busy processes doesn't perturb its inference threads. taskpolicy
+    # ships with macOS and doesn't need sudo. -t 0 / -l 0 set the highest
+    # throughput / latency tiers for the process.
     taskpolicy = shutil.which("taskpolicy")
     if taskpolicy:
         cmd = [taskpolicy, "-t", "0", "-l", "0", *cmd]
     # Detach from this process so the engine outlives the SessionStart hook.
+    # `cwd` is the engine dir so the engine resolves its bundled files.
     proc = subprocess.Popen(
         cmd,
+        cwd=ENGINE_DIR,
         stdout=log_fh,
         stderr=log_fh,
         stdin=subprocess.DEVNULL,
@@ -152,49 +207,20 @@ def ensure_engine_running(boot_timeout: float = 30.0) -> None:
     )
 
 
-# --- voice models ----------------------------------------------------------
-
-
-def installed_model_uuids(client: httpx.Client) -> set[str]:
-    r = client.get("/aivm_models")
-    r.raise_for_status()
-    data = r.json()
-    # /aivm_models returns {uuid: {...}, uuid2: {...}}
-    if isinstance(data, dict):
-        return set(data.keys())
-    if isinstance(data, list):
-        return {m.get("aivm_model_uuid") for m in data if m.get("aivm_model_uuid")}
-    return set()
-
-
-def install_model(client: httpx.Client, uuid: str) -> None:
-    download_url = (
-        f"https://api.aivis-project.com/v1/aivm-models/{uuid}/download?model_type=AIVMX"
-    )
-    r = client.post("/aivm_models/install", data={"url": download_url}, timeout=120.0)
-    r.raise_for_status()
-
-
-def ensure_voices() -> None:
-    with httpx.Client(base_url=ENGINE_BASE_URL, timeout=30.0) as client:
-        already = installed_model_uuids(client)
-        missing = [v for v in VOICES if v["uuid"] not in already]
-        if not missing:
-            return
-        for v in missing:
-            log(f"installing voice: {v['name']}")
-            install_model(client, v["uuid"])
-
-
 # --- entrypoint ------------------------------------------------------------
 
 
 def main() -> int:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     try:
-        ensure_engine_binary()
-        ensure_engine_running()
-        ensure_voices()
+        # Concurrent SessionStarts each run this script; serialize them so
+        # only one downloads / migrates / spawns, and the rest find the
+        # engine ready once they get the lock.
+        with SETUP_LOCK.open("w") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            migrate_legacy_engine()
+            ensure_engine_binary()
+            ensure_engine_running()
     except Exception as e:
         log(f"setup failed: {e!r}")
         return 1

@@ -7,9 +7,9 @@ disable-model-invocation: true
 
 The session-tts plugin reads Claude responses aloud via `Stop`, `StopFailure`, and `Notification` hooks. A `SessionStart` hook assigns this session a voice and marks it ON automatically (unless `SESSION_TTS_ENABLED=0`), so every new session speaks by default. This skill is the override path: silence the current session, re-enable after silencing, or check status.
 
-The voice assigned to this session is decided once at SessionStart and stays the same even after `tts off`/`tts on` — only playback is gated.
+The voice assigned to this session is decided once — at SessionStart, or on the first `tts on` for a session that started with `SESSION_TTS_ENABLED=0` — and stays the same after later `tts off`/`tts on`; only playback is gated.
 
-The silence flag lives at `$HOME/.claude/session-tts/sessions/$CLAUDE_CODE_SESSION_ID/silenced`: when present, the dispatcher skips playback for this session. Other concurrent sessions stay as they are. Switching to `off` (directly or via `toggle`) additionally terminates any utterance that is still playing for this session, so the silence takes effect immediately rather than draining the current chunk queue. When `tts on` is called on a session that was silenced at start (via `SESSION_TTS_ENABLED=0`), it performs late activation: removes the silenced flag, ensures the engine is running, and injects the narration context.
+The silence flag lives at `$HOME/.claude/session-tts/sessions/$CLAUDE_CODE_SESSION_ID/silenced`: when present, the dispatcher skips playback for this session. Other concurrent sessions stay as they are. Switching to `off` (directly or via `toggle`) additionally terminates any utterance that is still playing for this session, so the silence takes effect immediately rather than draining the current chunk queue. When `tts on` is called on a session that was silenced at start (via `SESSION_TTS_ENABLED=0`), it performs late activation: assigns the session a voice from the rotation, removes the silenced flag, ensures the engine is running, and injects the narration context.
 
 Run the action below with the Bash tool. Default to `status` when `$ARGUMENTS` is empty.
 
