@@ -2,6 +2,12 @@
 # script that needs to resolve the per-session voice and forward text to the
 # core (say-response.py).
 #
+# ensure_speaker <session_id>
+#   Gives the session a voice from the rotation unless it already holds one
+#   of SESSION_TTS_VOICE_IDS. A speaker file holding any other id (e.g. an
+#   AivisSpeech style id from session-tts <= 0.13) is replaced. Returns 0
+#   when it assigned a voice, 1 when the existing one was kept.
+#
 # resolve_speaker <session_id>
 #   Prints the assigned speaker id on stdout. Returns 1 if the session has
 #   no voice assigned or has been silenced via /session-tts:tts off.
@@ -19,6 +25,38 @@
 #   root from this file's own location (lib/ → ../..) so callers from either
 #   entry point work without having to pre-export the variable.
 
+# Rotation order: VOICEVOX Engine 0.26.2 style ids of each character's
+# ノーマル style, as listed by the engine's /speakers.
+SESSION_TTS_VOICE_IDS=(
+  3    # ずんだもん
+  2    # 四国めたん
+  8    # 春日部つむぎ
+  14   # 冥鳴ひまり
+  108  # 東北きりたん
+)
+
+ensure_speaker() {
+  local session_id="$1"
+  local data_dir="$HOME/.claude/session-tts"
+  local session_dir="$data_dir/sessions/$session_id"
+  local index_file="$data_dir/index"
+
+  local current id
+  current=$(cat "$session_dir/speaker" 2>/dev/null || echo "")
+  for id in "${SESSION_TTS_VOICE_IDS[@]}"; do
+    [ "$current" = "$id" ] && return 1
+  done
+
+  local prev next
+  prev=$(cat "$index_file" 2>/dev/null || echo -1)
+  case "$prev" in ''|*[!0-9]*) prev=-1 ;; esac
+  next=$(( (prev + 1) % ${#SESSION_TTS_VOICE_IDS[@]} ))
+  mkdir -p "$session_dir"
+  echo "$next" > "$index_file"
+  echo "${SESSION_TTS_VOICE_IDS[$next]}" > "$session_dir/speaker"
+  return 0
+}
+
 resolve_speaker() {
   local session_id="$1"
   local data_dir="$HOME/.claude/session-tts"
@@ -28,11 +66,11 @@ resolve_speaker() {
   [ ! -e "$session_dir/speaker" ] && return 1
   [ -e "$session_dir/silenced" ] && return 1
 
-  local speaker_id
-  speaker_id=$(cat "$session_dir/speaker" 2>/dev/null || echo "")
-  [ -z "$speaker_id" ] && return 1
+  # Sessions that started under an older plugin version may still hold a
+  # voice id the current engine does not have.
+  ensure_speaker "$session_id" || true
 
-  printf '%s' "$speaker_id"
+  cat "$session_dir/speaker"
 }
 
 _voice_context_plugin_root() {

@@ -8,8 +8,10 @@
 # the current chunk queue drains — surprising and frustrating.
 #
 # When activating a session that was started with SESSION_TTS_ENABLED=0,
-# performs late activation: removes silenced, ensures the engine is running,
-# and outputs the narration context so the model learns how to use TTS.
+# performs late activation: assigns the session a voice from the rotation
+# (disabled sessions start without one), removes silenced, ensures the engine
+# is running, and outputs the narration context so the model learns how to
+# use TTS.
 
 set -e
 
@@ -100,6 +102,7 @@ silence_on() {
 silence_off() {
   local was_silenced=0
   [ -e "$silenced_file" ] && was_silenced=1
+  ensure_speaker "$session_id" || true
   rm -f "$silenced_file"
 
   if [ "$was_silenced" = "1" ]; then

@@ -5,17 +5,20 @@ on:
     branches: [main]
     paths:
       - "session-tts/python/**"
-      - "session-tts/scripts/say-response.py"
+      - "session-tts/scripts/**"
+      - "session-tts/skills/**"
       - ".github/workflows/session-tts-python-tests.yml"
   pull_request:
     paths:
       - "session-tts/python/**"
-      - "session-tts/scripts/say-response.py"
+      - "session-tts/scripts/**"
+      - "session-tts/skills/**"
       - ".github/workflows/session-tts-python-tests.yml"
 
 jobs:
   test:
-    # Pure-function text-cleanup tests; no audio/macOS specifics in scope.
+    # Text-cleanup and shell-adapter tests with a stub uv; no audio/macOS
+    # specifics in scope.
     # Linux runners are faster and cheaper than macOS for this.
     runs-on: ubuntu-latest
     defaults:
