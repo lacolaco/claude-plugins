@@ -7,7 +7,7 @@ Claude Code plugins by lacolaco.
 | Plugin | Description |
 |--------|-------------|
 | [protect-main-branch](./protect-main-branch) | Prevent git operations that would modify the main branch (configurable) |
-| [session-tts](./session-tts) | Read Claude Code responses aloud locally with a different Japanese voice per session. Instructs Claude to deliver mid-turn progress narration via a synchronous Bash call into the say adapter. Permission prompts include the workspace name. ON by default; controllable via `SESSION_TTS_ENABLED` env var; playback volume is adjustable via `/session-tts:volume`. Engine and voices (VOICEVOX) are managed automatically (Apple Silicon) |
+| [session-tts](./session-tts) | Read Claude Code responses aloud locally with a different Japanese voice and stereo position per session. Instructs Claude to deliver mid-turn progress narration via a synchronous Bash call into the say adapter. Permission prompts include the workspace name. ON by default; controllable via `SESSION_TTS_ENABLED` env var; playback volume is adjustable via `/session-tts:volume`. Engine and voices (VOICEVOX) are managed automatically (Apple Silicon) |
 
 ## protect-main-branch
 
@@ -85,13 +85,13 @@ The allowlist accepts any subcommand, including `commit` and `push` — the plug
 
 ## session-tts
 
-Reads Claude Code's responses aloud on your local machine. Each Claude Code session is automatically assigned one of five Japanese [VOICEVOX](https://voicevox.hiroshiba.jp/) voices in a fixed rotation (ずんだもん, 四国めたん, 春日部つむぎ, 冥鳴ひまり, 東北きりたん), so when several sessions are running you can tell them apart by voice. Synthesis happens locally on a plugin-managed VOICEVOX Engine; no external API is called during playback.
+Reads Claude Code's responses aloud on your local machine. Each Claude Code session is automatically assigned one of five Japanese [VOICEVOX](https://voicevox.hiroshiba.jp/) voices in a fixed rotation (ずんだもん, 四国めたん, 春日部つむぎ, 冥鳴ひまり, 東北きりたん), and plays from its own left/right stereo position picked at random, so when several sessions are running you can tell them apart by voice and by direction. Synthesis happens locally on a plugin-managed VOICEVOX Engine; no external API is called during playback.
 
 ### How it works
 
 The plugin subscribes to six hook events:
 
-- **`SessionStart`** — assigns this session the next voice in the rotation (the assignment is stored at `~/.claude/session-tts/sessions/$session_id/speaker` and stays stable across `clear`/`compact` re-fires). When `SESSION_TTS_ENABLED=0`, the session starts silenced without a voice (no context injection, no engine bootstrap, no announcement) and does not consume a rotation slot, so disabled sessions such as workers or `claude -p` runs do not make active sessions share a voice. It also kicks off a background engine bootstrap that is idempotent: typical re-runs do nothing.
+- **`SessionStart`** — assigns this session the next voice in the rotation (the assignment is stored at `~/.claude/session-tts/sessions/$session_id/speaker` and stays stable across `clear`/`compact` re-fires) and a random stereo position (stored next to it as `pan`, also kept for the whole session). When `SESSION_TTS_ENABLED=0`, the session starts silenced without a voice (no context injection, no engine bootstrap, no announcement) and does not consume a rotation slot, so disabled sessions such as workers or `claude -p` runs do not make active sessions share a voice. It also kicks off a background engine bootstrap that is idempotent: typical re-runs do nothing.
 - **`SessionEnd`** — fires when this session terminates (`/clear`, `/compact`, logout, etc.). SIGTERMs any in-flight playback for this session via the per-session pidfile (`sessions/$session_id/playback`) so audio doesn't outlive the session that started it. The session directory and its contents are intentionally left in place so the same session_id keeps its voice across `/clear`.
 - **`Stop`** — fires when Claude finishes a normal response; speaks `last_assistant_message`
 - **`StopFailure`** — fires when the turn ends due to an API error; speaks `last_assistant_message`
@@ -105,7 +105,7 @@ The plugin subscribes to six hook events:
 
 On the first session ever, the SessionStart hook downloads VOICEVOX Engine 0.26.2 (macOS arm64, about 1.8 GB; the voice models are bundled) into `~/.claude/session-tts/voicevox-engine/` and starts it on `127.0.0.1:50121`, a port distinct from the VOICEVOX desktop app's default (50021). From then on it just probes the engine's health endpoint (sub-100 ms) and exits; after a reboot it restarts the engine (about 10 s).
 
-Upgrading from session-tts 0.13 or earlier: the first SessionStart stops the AivisSpeech engine the plugin started (recorded in `~/.claude/session-tts/engine.pid`), deletes `~/.claude/session-tts/engine/`, and installs VOICEVOX Engine. Sessions that still hold an AivisSpeech voice id get the next VOICEVOX voice the next time they speak.
+Upgrading from session-tts 0.13 or earlier: the first SessionStart stops the AivisSpeech engine the plugin started (recorded in `~/.claude/session-tts/engine.pid`), deletes `~/.claude/session-tts/engine/`, and installs VOICEVOX Engine. Sessions that still hold an AivisSpeech voice id get the next VOICEVOX voice the next time they speak. Sessions started under 0.14 get their stereo position the next time they speak.
 
 ### Architecture
 
@@ -117,7 +117,7 @@ The plugin is structured around a single **core**, `scripts/say-response.py`, th
 - Trims token-leading `!` (e.g. GitLab `MR !107`, `!42`) before synthesis. The `!` there is a reference sigil, not an exclamation, and the engine would otherwise pause between it and the number. Mid- or end-of-word `!` (`Done!`, `Wow! Great`) keeps its exclamation prosody.
 - Collapses runs of decorative dashes from `―—–─━` (2+ in a row, e.g. ` Insight ―――`, `━━━ section ━━━`) to a single space so the engine doesn't read the separators aloud or pause on them. A lone `—` / `–` is left alone so it can still function as prose punctuation.
 - Splits text on **paragraph boundaries first**, then sentence boundaries (`。．！？!?` and ASCII `.`) inside each paragraph. Commas (`、，,`) are deliberately **not** split points — every chunk adds `prePhonemeLength` lead-in silence plus an `afplay` device-open transient, so splitting at commas would turn the engine's natural micro-pause into a much longer unnatural gap. The first chunk is intentionally small (≤ 60 chars) so the first audible word arrives quickly even on long responses; later chunks are larger (≤ 250 chars) for natural cadence. Markdown headings (`## title`) are *not* emitted as their own paragraph — the heading text is folded into the next paragraph with a `。` separator, so a single-word heading does not become a 2-character chunk bracketed by audible silence.
-- Synthesizes chunks via the local engine's HTTP API over a keep-alive `httpx.Client` and pushes each WAV onto a playback queue so audio starts as soon as the first chunk is ready (synthesis and playback run in parallel)
+- Synthesizes chunks via the local engine's HTTP API over a keep-alive `httpx.Client`, converts each mono WAV to stereo at the session's position (constant-power panning, limited to ±0.8 so both ears stay audible), and pushes each WAV onto a playback queue so audio starts as soon as the first chunk is ready (synthesis and playback run in parallel)
 - A player thread drains the queue, plays each WAV with macOS `afplay` in order, and deletes the temp files
 
 Around the core are thin **adapters**, one per input source. Each adapter is responsible for whatever its own input contract dictates (hook payload schemas, notification fields, skill arguments) and ends with a plain-text call into the core via `scripts/lib/voice-context.sh`:

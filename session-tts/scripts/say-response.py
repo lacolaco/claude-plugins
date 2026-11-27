@@ -8,12 +8,16 @@ knows nothing about hook payload shapes.
 Pipeline (synth and playback run in parallel):
   text → strip markdown → split into small chunks
                       → [synth thread]  HTTP /audio_query + /synthesis
+                                        → pan mono WAV to stereo
                       → [player thread] afplay each WAV in order
 The first chunk is intentionally small so the first audible word arrives
 quickly even on long responses.
 """
 from __future__ import annotations
 
+import array
+import io
+import math
 import os
 import queue
 import re
@@ -22,6 +26,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import wave
 
 import httpx
 
@@ -86,6 +91,64 @@ def resolve_playback_volume() -> str:
     if not 0.0 <= value <= 1.0:
         return f"{_resolve_default_volume():.2f}"
     return f"{value:.2f}"
+
+# Per-session stereo position, so concurrent sessions can be told apart by
+# where the voice comes from as well as by the voice itself. PAN_FILE holds
+# the session's position in [-1, 1], picked at random by ensure_pan in
+# voice-context.sh; the pan actually applied is that position scaled by
+# PAN_RANGE (-1 = full left, 1 = full right). PAN_RANGE below 1 keeps both
+# ears audible for every session. A missing, unparseable, or out-of-range
+# file plays centred.
+PAN_RANGE = 0.8
+PAN_FILE = (
+    os.path.expanduser(f"~/.claude/session-tts/sessions/{SESSION_ID}/pan")
+    if SESSION_ID
+    else ""
+)
+
+
+def resolve_pan() -> float:
+    try:
+        with open(PAN_FILE) as f:
+            value = float(f.read().strip())
+    except (FileNotFoundError, ValueError, OSError):
+        return 0.0
+    if not -1.0 <= value <= 1.0:
+        return 0.0
+    return value * PAN_RANGE
+
+
+def apply_pan(wav_bytes: bytes, pan: float) -> bytes:
+    """Turn a mono 16-bit WAV into a stereo one placed at `pan` (-1..1).
+
+    Neither the engine (`outputStereo` only duplicates the channel) nor
+    `afplay` can pan, so the channel gains are applied here. Constant-power
+    law: left = cos θ, right = sin θ with θ = (pan + 1) · π/4, so the total
+    power stays the same at every position and no gain exceeds 1 (no
+    clipping). Input that is not mono 16-bit PCM is returned unchanged.
+    """
+    with wave.open(io.BytesIO(wav_bytes), "rb") as src:
+        if src.getnchannels() != 1 or src.getsampwidth() != 2:
+            return wav_bytes
+        rate = src.getframerate()
+        mono = array.array("h", src.readframes(src.getnframes()))
+    if sys.byteorder == "big":
+        mono.byteswap()
+    theta = (pan + 1.0) * math.pi / 4.0
+    left_gain, right_gain = math.cos(theta), math.sin(theta)
+    stereo = array.array("h", bytes(len(mono) * 4))
+    stereo[0::2] = array.array("h", (int(s * left_gain) for s in mono))
+    stereo[1::2] = array.array("h", (int(s * right_gain) for s in mono))
+    if sys.byteorder == "big":
+        stereo.byteswap()
+    out = io.BytesIO()
+    with wave.open(out, "wb") as dst:
+        dst.setnchannels(2)
+        dst.setsampwidth(2)
+        dst.setframerate(rate)
+        dst.writeframes(stereo.tobytes())
+    return out.getvalue()
+
 
 # Per-session pidfile. Holds the process-group id of the most recent
 # in-flight playback for this session. A new utterance reads the file,
@@ -414,6 +477,7 @@ def synth_worker(
     speaker_id: int,
     chunks: list[str],
     play_queue: "queue.Queue[str | None]",
+    pan: float,
 ) -> None:
     speed_scale = (
         FAST_SPEED_SCALE if len(chunks) >= FAST_SPEED_CHUNK_THRESHOLD else 1.0
@@ -427,6 +491,7 @@ def synth_worker(
                 # better to lose one sentence than to leave the user wondering
                 # why nothing is being read.
                 continue
+            wav_bytes = apply_pan(wav_bytes, pan)
             with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
                 f.write(wav_bytes)
                 path = f.name
@@ -467,7 +532,7 @@ def main() -> None:
             play_queue: "queue.Queue[str | None]" = queue.Queue()
             synth_thread = threading.Thread(
                 target=synth_worker,
-                args=(client, SPEAKER_ID, chunks, play_queue),
+                args=(client, SPEAKER_ID, chunks, play_queue, resolve_pan()),
                 daemon=False,
             )
             player_thread = threading.Thread(

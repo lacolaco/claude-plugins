@@ -5,8 +5,16 @@
 # ensure_speaker <session_id>
 #   Gives the session a voice from the rotation unless it already holds one
 #   of SESSION_TTS_VOICE_IDS. A speaker file holding any other id (e.g. an
-#   AivisSpeech style id from session-tts <= 0.13) is replaced. Returns 0
-#   when it assigned a voice, 1 when the existing one was kept.
+#   AivisSpeech style id from session-tts <= 0.13) is replaced. Also gives
+#   the session a stereo position (ensure_pan). Returns 0 when it assigned a
+#   voice, 1 when the existing one was kept.
+#
+# ensure_pan <session_id>
+#   Gives the session a random stereo position unless sessions/<sid>/pan
+#   already holds a valid one: a decimal in [-1, 1] (-1 = left edge,
+#   1 = right edge of PAN_RANGE in say-response.py). Invalid content is
+#   replaced. Called from ensure_speaker, so the position is assigned
+#   together with the voice and kept for the whole session.
 #
 # resolve_speaker <session_id>
 #   Prints the assigned speaker id on stdout. Returns 1 if the session has
@@ -35,11 +43,30 @@ SESSION_TTS_VOICE_IDS=(
   108  # 東北きりたん
 )
 
+ensure_pan() {
+  local pan_file="$HOME/.claude/session-tts/sessions/$1/pan"
+  local current
+  current=$(cat "$pan_file" 2>/dev/null || echo "")
+  if [[ "$current" =~ ^-?(0(\.[0-9]+)?|1(\.0+)?)$ ]]; then
+    return 0
+  fi
+  # Uniform over -1.000 .. 1.000 in steps of 0.001.
+  local n=$(( RANDOM % 2001 - 1000 )) sign=""
+  if [ "$n" -lt 0 ]; then
+    sign="-"
+    n=$(( -n ))
+  fi
+  mkdir -p "$(dirname "$pan_file")"
+  printf '%s%d.%03d\n' "$sign" $(( n / 1000 )) $(( n % 1000 )) > "$pan_file"
+}
+
 ensure_speaker() {
   local session_id="$1"
   local data_dir="$HOME/.claude/session-tts"
   local session_dir="$data_dir/sessions/$session_id"
   local index_file="$data_dir/index"
+
+  ensure_pan "$session_id"
 
   local current id
   current=$(cat "$session_dir/speaker" 2>/dev/null || echo "")
