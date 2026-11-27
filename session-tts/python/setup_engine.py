@@ -63,7 +63,7 @@ def log(msg: str) -> None:
 
 def _is_legacy_engine(pid: int) -> bool:
     r = subprocess.run(
-        ["ps", "-o", "command=", "-p", str(pid)],
+        ["ps", "-ww", "-o", "command=", "-p", str(pid)],
         capture_output=True,
         text=True,
         check=False,
